@@ -1,14 +1,16 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { delimiter, dirname, join } from "node:path";
 
-import { QemuBinaryNotFoundError } from "./errors";
+import { QemuBinaryNotFoundError, QemuInvalidCommandError } from "./errors";
 import {
   HostPlatform,
   MVP_COMMANDS,
   PLATFORM_PACKAGES,
+  QEMU_COMMANDS,
   QemuCommand,
   executableName,
   getHostPlatform,
+  isQemuCommand,
   isWindowsPlatform,
 } from "./platform";
 
@@ -135,6 +137,15 @@ export function resolveQemuBinary(
   command: QemuCommand,
   options: Omit<ResolveQemuOptions, "command"> = {}
 ): ResolvedQemuBinary {
+  // Enforce the allowlist before deriving any path: the QemuCommand type is
+  // erased at runtime, so a caller forwarding untrusted input could otherwise
+  // smuggle "../../bin/sh" and have us resolve + spawn an arbitrary binary.
+  if (!isQemuCommand(command)) {
+    throw new QemuInvalidCommandError(
+      `Unknown QEMU command ${JSON.stringify(command)}.\n` +
+        `Allowed commands: ${QEMU_COMMANDS.join(", ")}.`
+    );
+  }
   const platform = options.platform ?? getHostPlatform();
   const packageName = PLATFORM_PACKAGES[platform];
   const exe = executableName(command, platform);

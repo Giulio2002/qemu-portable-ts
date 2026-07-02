@@ -52,3 +52,12 @@ export class QmpProtocolError extends QemuError {
 export class InvalidVmConfigError extends QemuError {
   readonly code = "ERR_QEMU_INVALID_VM_CONFIG";
 }
+
+/**
+ * A command string that is not one of the known QEMU commands was passed to
+ * the resolver/process layer. Guards against path traversal and arbitrary
+ * binary execution when a caller forwards untrusted input as a command.
+ */
+export class QemuInvalidCommandError extends QemuError {
+  readonly code = "ERR_QEMU_INVALID_COMMAND";
+}

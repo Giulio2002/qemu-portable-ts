@@ -183,6 +183,92 @@ test("non-integer forward ports throw InvalidVmConfigError", () => {
   );
 });
 
+test("out-of-range forward ports throw InvalidVmConfigError", () => {
+  for (const ports of [
+    { hostPort: 70000, guestPort: 22 },
+    { hostPort: 22, guestPort: -1 },
+  ]) {
+    assert.throws(
+      () =>
+        buildQemuSystemArgs(
+          { target: "x86_64", network: { type: "user", hostForwards: [{ protocol: "tcp", ...ports }] } },
+          "linux"
+        ),
+      InvalidVmConfigError
+    );
+  }
+});
+
+// Regression: a malicious hostAddress/guestAddress must not be able to break
+// out of hostfwd= and inject extra -netdev options (e.g. guestfwd=...-cmd:...,
+// which would run a command on the host).
+test("forward addresses with injection characters are rejected", () => {
+  const attempts = [
+    { hostAddress: "127.0.0.1,guestfwd=tcp:1.1.1.1:9-cmd:/bin/sh" },
+    { hostAddress: "127.0.0.1,restrict=off" },
+    { guestAddress: "10.0.2.15,smb=/etc" },
+    { hostAddress: "127.0.0.1 -device foo" },
+  ];
+  for (const attempt of attempts) {
+    assert.throws(
+      () =>
+        buildQemuSystemArgs(
+          {
+            target: "x86_64",
+            network: {
+              type: "user",
+              hostForwards: [{ protocol: "tcp", hostPort: 2222, guestPort: 22, ...attempt }],
+            },
+          },
+          "linux"
+        ),
+      (err: Error) => {
+        assert.ok(err instanceof InvalidVmConfigError, `expected reject for ${JSON.stringify(attempt)}`);
+        return true;
+      }
+    );
+  }
+});
+
+test("invalid forward protocol is rejected", () => {
+  assert.throws(
+    () =>
+      buildQemuSystemArgs(
+        {
+          target: "x86_64",
+          network: {
+            type: "user",
+            hostForwards: [{ protocol: "icmp" as never, hostPort: 2222, guestPort: 22 }],
+          },
+        },
+        "linux"
+      ),
+    InvalidVmConfigError
+  );
+});
+
+test("legitimate IPv4/IPv6/empty forward addresses are accepted", () => {
+  const { args } = buildQemuSystemArgs(
+    {
+      target: "x86_64",
+      network: {
+        type: "user",
+        hostForwards: [
+          { protocol: "tcp", hostAddress: "127.0.0.1", hostPort: 2222, guestPort: 22 },
+          { protocol: "udp", hostAddress: "[::1]", hostPort: 5353, guestAddress: "10.0.2.15", guestPort: 53 },
+        ],
+      },
+    },
+    "linux"
+  );
+  const netdev = args[args.indexOf("-netdev") + 1];
+  // No injected option separators survived: exactly the two hostfwd clauses.
+  assert.equal(netdev.match(/hostfwd=/g)?.length, 2);
+  assert.ok(!netdev.includes("guestfwd"));
+  assert.ok(netdev.includes("hostfwd=tcp:127.0.0.1:2222-:22"));
+  assert.ok(netdev.includes("hostfwd=udp:[::1]:5353-10.0.2.15:53"));
+});
+
 test("extraArgs are appended last as the escape hatch", () => {
   const { args } = buildQemuSystemArgs(
     { target: "x86_64", extraArgs: ["-machine", "help"] },

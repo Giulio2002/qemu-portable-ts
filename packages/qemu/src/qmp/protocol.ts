@@ -6,6 +6,7 @@
  * then exchanges `{"execute": ...}` / `{"return": ...}` pairs. Asynchronous
  * events arrive as objects with an `"event"` key.
  */
+import { QmpProtocolError } from "../errors";
 
 export interface QmpGreeting {
   QMP: {
@@ -58,6 +59,17 @@ export function isQmpResponse(msg: unknown): msg is QmpResponse {
   );
 }
 
+export interface QmpFramerOptions {
+  /**
+   * Maximum bytes to buffer for a single not-yet-terminated line. A peer that
+   * never sends a newline would otherwise grow this buffer without bound
+   * (memory-exhaustion DoS). QMP is treated as an untrusted input source.
+   */
+  maxLineBytes?: number;
+}
+
+const DEFAULT_MAX_LINE_BYTES = 16 * 1024 * 1024;
+
 /**
  * Incremental framer for the newline-delimited JSON stream QMP emits.
  * Feed it raw socket chunks; it yields complete parsed messages and
@@ -65,6 +77,11 @@ export function isQmpResponse(msg: unknown): msg is QmpResponse {
  */
 export class QmpFramer {
   private buffer = "";
+  private readonly maxLineBytes: number;
+
+  constructor(options: QmpFramerOptions = {}) {
+    this.maxLineBytes = options.maxLineBytes ?? DEFAULT_MAX_LINE_BYTES;
+  }
 
   /** Returns all complete messages contained in the stream so far. */
   push(chunk: Buffer | string): QmpMessage[] {
@@ -77,6 +94,18 @@ export class QmpFramer {
       this.buffer = this.buffer.slice(newlineIndex + 1);
       if (!line) continue;
       messages.push(JSON.parse(line) as QmpMessage);
+    }
+
+    // Whatever remains is an unterminated partial line; refuse to buffer an
+    // unbounded amount of it.
+    if (this.buffer.length > this.maxLineBytes) {
+      const seen = this.buffer.length;
+      this.buffer = "";
+      throw new QmpProtocolError(
+        `QMP line exceeded ${this.maxLineBytes} bytes without a newline ` +
+          `(buffered ${seen}); refusing to continue. The peer may be ` +
+          `malicious or desynchronized.`
+      );
     }
     return messages;
   }

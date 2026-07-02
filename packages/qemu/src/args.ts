@@ -65,6 +65,25 @@ export function escapeQemuOptionValue(value: string): string {
   return value.replace(/,/g, ",,");
 }
 
+// A host/guest address inside a `hostfwd=` spec may only be an IPv4 literal, a
+// bracketed/bare IPv6 literal, a hostname, or empty. The character that lets a
+// value escape the forward and inject a *new* `-netdev` sub-option (e.g. a
+// `guestfwd=...-cmd:<command>` that runs on the host) is the comma, so commas —
+// and anything else outside this conservative set, including spaces — are
+// rejected. Colons are permitted because IPv6 literals need them and they stay
+// contained within the caller's own forward clause.
+const SAFE_FORWARD_ADDRESS = /^[A-Za-z0-9._%:\-[\]]*$/;
+
+function validateForwardAddress(kind: "hostAddress" | "guestAddress", value: string): string {
+  if (!SAFE_FORWARD_ADDRESS.test(value)) {
+    throw new InvalidVmConfigError(
+      `Invalid ${kind} ${JSON.stringify(value)}: only IPv4/IPv6/hostname ` +
+        `characters are allowed. This restriction prevents QEMU option injection.`
+    );
+  }
+  return value;
+}
+
 export function systemCommandForTarget(target: GuestTarget): QemuSystemCommand {
   switch (target) {
     case "x86_64":
@@ -98,9 +117,12 @@ export function getAccelerationArgs(
 }
 
 function diskArgs(disk: DiskConfig, index: number): string[] {
+  // Every interpolated field is escaped, not just the path: a caller that
+  // passes an unvalidated format/interface string must not be able to inject
+  // extra -drive sub-options through an unescaped comma.
   const parts = [`file=${escapeQemuOptionValue(disk.path)}`];
-  if (disk.format) parts.push(`format=${disk.format}`);
-  parts.push(`if=${disk.interface ?? "virtio"}`);
+  if (disk.format) parts.push(`format=${escapeQemuOptionValue(disk.format)}`);
+  parts.push(`if=${escapeQemuOptionValue(disk.interface ?? "virtio")}`);
   parts.push(`index=${index}`);
   if (disk.readonly) parts.push("readonly=on");
   if (disk.snapshot) parts.push("snapshot=on");
@@ -113,8 +135,21 @@ function hostForwardSpec(fwd: HostForward): string {
       `Host forward ports must be integers (got host=${fwd.hostPort}, guest=${fwd.guestPort}).`
     );
   }
-  const hostAddr = fwd.hostAddress ?? "127.0.0.1";
-  const guestAddr = fwd.guestAddress ?? "";
+  if (
+    fwd.hostPort < 0 || fwd.hostPort > 65535 ||
+    fwd.guestPort < 0 || fwd.guestPort > 65535
+  ) {
+    throw new InvalidVmConfigError(
+      `Host forward ports must be in 0..65535 (got host=${fwd.hostPort}, guest=${fwd.guestPort}).`
+    );
+  }
+  if (fwd.protocol !== "tcp" && fwd.protocol !== "udp") {
+    throw new InvalidVmConfigError(
+      `Host forward protocol must be "tcp" or "udp" (got ${JSON.stringify(fwd.protocol)}).`
+    );
+  }
+  const hostAddr = validateForwardAddress("hostAddress", fwd.hostAddress ?? "127.0.0.1");
+  const guestAddr = validateForwardAddress("guestAddress", fwd.guestAddress ?? "");
   return `hostfwd=${fwd.protocol}:${hostAddr}:${fwd.hostPort}-${guestAddr}:${fwd.guestPort}`;
 }
 

@@ -65,27 +65,35 @@ function startMockQmpServer(): Promise<MockQmpServer> {
   const server = createServer((socket) => {
     socket.write(JSON.stringify(greeting) + "\r\n");
     const framer = new QmpFramer();
+    // Real QEMU echoes the command's `id` back on the response; the mock must
+    // do the same or the client (which now correlates by id) ignores replies.
+    const reply = (body: object, id: unknown) =>
+      socket.write(JSON.stringify(id === undefined ? body : { ...body, id }) + "\r\n");
     socket.on("data", (chunk) => {
       for (const msg of framer.push(chunk)) {
-        const cmd = msg as { execute?: string };
+        const cmd = msg as { execute?: string; id?: unknown };
         switch (cmd.execute) {
           case "qmp_capabilities":
-            socket.write('{"return": {}}\r\n');
+            reply({ return: {} }, cmd.id);
             break;
           case "query-status":
-            socket.write('{"return": {"status": "running", "running": true}}\r\n');
+            reply({ return: { status: "running", running: true } }, cmd.id);
             break;
           case "system_powerdown":
-            socket.write('{"return": {}}\r\n');
+            reply({ return: {} }, cmd.id);
             socket.write(
               '{"event": "POWERDOWN", "timestamp": {"seconds": 1, "microseconds": 0}}\r\n'
             );
             break;
           default:
-            socket.write(
-              JSON.stringify({
-                error: { class: "CommandNotFound", desc: `The command ${cmd.execute} has not been found` },
-              }) + "\r\n"
+            reply(
+              {
+                error: {
+                  class: "CommandNotFound",
+                  desc: `The command ${cmd.execute} has not been found`,
+                },
+              },
+              cmd.id
             );
         }
       }
@@ -159,4 +167,65 @@ test("QmpClient surfaces QMP errors as QmpProtocolError", async (t) => {
 test("QmpClient rejects execute when not connected", async () => {
   const client = new QmpClient({ socketPath: "/nonexistent.sock" });
   await assert.rejects(client.execute("query-status"), QmpProtocolError);
+});
+
+// Regression: responses are correlated by id, so out-of-order replies (or a
+// dropped/timed-out earlier request) never mis-match one command's result to
+// another command's promise. FIFO positional matching would fail this.
+test("QmpClient correlates concurrent commands by id, not arrival order", async (t) => {
+  if (process.platform === "win32") {
+    t.skip("unix socket mock not applicable on Windows");
+    return;
+  }
+  const socketPath = join(mkdtempSync(join(tmpdir(), "qmp-order-")), "qmp.sock");
+  const greeting = {
+    QMP: { version: { qemu: { major: 10, minor: 0, micro: 2 }, package: "mock" }, capabilities: [] },
+  };
+  const server = createServer((socket) => {
+    socket.write(JSON.stringify(greeting) + "\r\n");
+    const framer = new QmpFramer();
+    const buffered: Array<{ execute?: string; id?: unknown }> = [];
+    socket.on("data", (chunk) => {
+      for (const msg of framer.push(chunk)) {
+        const cmd = msg as { execute?: string; id?: unknown };
+        if (cmd.execute === "qmp_capabilities") {
+          socket.write(JSON.stringify({ return: {}, id: cmd.id }) + "\r\n");
+          continue;
+        }
+        buffered.push(cmd);
+        // Once both real commands are in, answer them in REVERSE order.
+        if (buffered.length === 2) {
+          const [first, second] = buffered;
+          socket.write(JSON.stringify({ return: { echo: second.execute }, id: second.id }) + "\r\n");
+          socket.write(JSON.stringify({ return: { echo: first.execute }, id: first.id }) + "\r\n");
+        }
+      }
+    });
+  });
+  await new Promise<void>((r) => server.listen(socketPath, () => r()));
+
+  const client = new QmpClient({ socketPath, timeoutMs: 5000 });
+  try {
+    await client.connect();
+    const p1 = client.execute<{ echo: string }>("cmd-one");
+    const p2 = client.execute<{ echo: string }>("cmd-two");
+    const [r1, r2] = await Promise.all([p1, p2]);
+    assert.equal(r1.echo, "cmd-one");
+    assert.equal(r2.echo, "cmd-two");
+  } finally {
+    await client.close();
+    await new Promise<void>((r) => server.close(() => r()));
+  }
+});
+
+test("QmpFramer rejects an unterminated line past the byte cap", () => {
+  const framer = new QmpFramer({ maxLineBytes: 100 });
+  assert.throws(
+    () => framer.push("x".repeat(200)), // no newline -> unbounded buffer risk
+    (err: Error) => {
+      assert.ok(err instanceof QmpProtocolError);
+      assert.match(err.message, /exceeded 100 bytes/);
+      return true;
+    }
+  );
 });

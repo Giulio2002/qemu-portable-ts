@@ -23,6 +23,10 @@ security reports. We aim to acknowledge reports within 72 hours.
 - The pinned QEMU version and source checksum live in `third_party/qemu/`;
   every release publishes the corresponding source.
 
+For the engineering-level threat model, trust boundaries, the table of which
+inputs are validated vs. passed through, and a hardening checklist, see
+[docs/security.md](./docs/security.md).
+
 ## QEMU is not automatically a sandbox
 
 Do not treat this package as a security boundary:

@@ -166,8 +166,13 @@ Running QEMU means running a large native process against potentially
 untrusted disk images, kernels, firmware, and guest code. **This package is
 not a sandbox**, especially in TCG (software emulation) mode. Defaults are
 conservative — headless display, no NIC unless requested, QMP over local IPC
-only — but the security boundary is yours to design. See
-[SECURITY.md](./SECURITY.md).
+only — but the security boundary is yours to design.
+
+- [SECURITY.md](./SECURITY.md) — reporting policy, supported versions, QEMU
+  update policy.
+- [docs/security.md](./docs/security.md) — **threat model, trust boundaries,
+  what the library validates vs. passes through, and a hardening checklist**
+  for handling untrusted input.
 
 ## Troubleshooting
 

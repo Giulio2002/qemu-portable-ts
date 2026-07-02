@@ -34,6 +34,24 @@ export const MVP_COMMANDS: QemuCommand[] = [
   "qemu-img",
 ];
 
+/**
+ * Every command the library will ever resolve or spawn. The QemuCommand type
+ * is compile-time only; this set is the runtime allowlist enforced at the
+ * resolver boundary so an untrusted command string can never traverse out of
+ * a package's bin/ directory into an arbitrary host executable.
+ */
+export const QEMU_COMMANDS: readonly QemuCommand[] = [
+  "qemu-system-x86_64",
+  "qemu-system-aarch64",
+  "qemu-system-riscv64",
+  "qemu-img",
+];
+
+/** Runtime type guard: is `value` one of the known QEMU commands? */
+export function isQemuCommand(value: unknown): value is QemuCommand {
+  return typeof value === "string" && (QEMU_COMMANDS as readonly string[]).includes(value);
+}
+
 /** Maps a host platform to the npm package that vendors its binaries. */
 export const PLATFORM_PACKAGES: Record<HostPlatform, string> = {
   "linux-x64": "@org/qemu-linux-x64",

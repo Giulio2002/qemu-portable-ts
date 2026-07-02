@@ -39,7 +39,12 @@ export class QmpClient extends EventEmitter {
   private socket?: Socket;
   private readonly framer = new QmpFramer();
   private greeting?: QmpGreeting;
-  private pending: PendingRequest[] = [];
+  // Correlate responses by the `id` we stamp on each command, NOT by arrival
+  // order. QMP guarantees in-order responses, but a timed-out request removed
+  // from the middle of a FIFO queue would silently misalign every response
+  // after it — matching one command's result to another command's promise.
+  private readonly pending = new Map<number, PendingRequest>();
+  private nextCommandId = 1;
   private closed = false;
 
   constructor(options: QmpClientOptions) {
@@ -133,22 +138,23 @@ export class QmpClient extends EventEmitter {
     }
     const timeoutMs = this.options.timeoutMs ?? 10_000;
 
+    const id = this.nextCommandId++;
     return new Promise<TResult>((resolve, reject) => {
       const request: PendingRequest = {
         resolve: (value) => resolve(value as TResult),
         reject,
       };
       request.timer = setTimeout(() => {
-        this.pending = this.pending.filter((p) => p !== request);
+        this.pending.delete(id);
         reject(
           new QmpProtocolError(
             `QMP command "${command}" timed out after ${timeoutMs} ms.`
           )
         );
       }, timeoutMs);
-      this.pending.push(request);
+      this.pending.set(id, request);
       socket.write(
-        serializeQmpCommand({ execute: command, arguments: args })
+        serializeQmpCommand({ execute: command, arguments: args, id })
       );
     });
   }
@@ -170,8 +176,13 @@ export class QmpClient extends EventEmitter {
       return;
     }
     if (isQmpResponse(msg)) {
-      const request = this.pending.shift();
-      if (!request) return; // response with no outstanding request; ignore
+      // We only ever send numeric ids; a response we cannot correlate (no id,
+      // or an id we are not waiting on) is ignored rather than mis-matched.
+      const id = typeof msg.id === "number" ? msg.id : undefined;
+      if (id === undefined) return;
+      const request = this.pending.get(id);
+      if (!request) return;
+      this.pending.delete(id);
       if (request.timer) clearTimeout(request.timer);
       if (msg.error) {
         request.reject(
@@ -187,8 +198,8 @@ export class QmpClient extends EventEmitter {
   }
 
   private failAll(err: Error): void {
-    const pending = this.pending;
-    this.pending = [];
+    const pending = [...this.pending.values()];
+    this.pending.clear();
     for (const request of pending) {
       if (request.timer) clearTimeout(request.timer);
       request.reject(err);
