@@ -132,6 +132,7 @@ linux-arm64-glibc
 darwin-arm64
 darwin-x64
 win32-x64
+win32-arm64
 ```
 
 Add these after MVP:
@@ -139,7 +140,6 @@ Add these after MVP:
 ```txt
 linux-x64-musl
 linux-arm64-musl
-win32-arm64
 freebsd-x64
 ```
 

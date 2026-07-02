@@ -60,7 +60,7 @@ jobs:
       # optionalDependencies already exist in the registry (project.md §14.3).
       - name: Publish platform packages
         run: |
-          for pkg in qemu-linux-x64 qemu-linux-arm64 qemu-darwin-arm64 qemu-darwin-x64 qemu-win32-x64; do
+          for pkg in qemu-linux-x64 qemu-linux-arm64 qemu-darwin-arm64 qemu-darwin-x64 qemu-win32-x64 qemu-win32-arm64; do
             npm publish "packages/$pkg" --provenance --access public
           done
         env:
@@ -91,7 +91,7 @@ jobs:
         with:
           body: |
             QEMU upstream version: $(cat third_party/qemu/QEMU_VERSION)
-            Platforms: linux-x64, linux-arm64, darwin-arm64, darwin-x64, win32-x64
+            Platforms: linux-x64, linux-arm64, darwin-arm64, darwin-x64, win32-x64, win32-arm64
 
             The attached source archive, patches, and build scripts are the
             complete corresponding source for the GPL-licensed binaries in the

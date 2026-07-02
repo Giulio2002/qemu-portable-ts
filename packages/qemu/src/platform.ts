@@ -9,7 +9,8 @@ export type HostPlatform =
   | "linux-arm64-musl"
   | "darwin-arm64"
   | "darwin-x64"
-  | "win32-x64";
+  | "win32-x64"
+  | "win32-arm64";
 
 /** Guest target: the architecture QEMU emulates or virtualizes. */
 export type GuestTarget = "x86_64" | "aarch64" | "riscv64";
@@ -61,6 +62,7 @@ export const PLATFORM_PACKAGES: Record<HostPlatform, string> = {
   "darwin-arm64": "@org/qemu-darwin-arm64",
   "darwin-x64": "@org/qemu-darwin-x64",
   "win32-x64": "@org/qemu-win32-x64",
+  "win32-arm64": "@org/qemu-win32-arm64",
 };
 
 export const SUPPORTED_PLATFORMS = Object.keys(
@@ -131,7 +133,10 @@ export function getHostPlatform(
     if (arch === "arm64") return "darwin-arm64";
     if (arch === "x64") return "darwin-x64";
   }
-  if (platform === "win32" && arch === "x64") return "win32-x64";
+  if (platform === "win32") {
+    if (arch === "x64") return "win32-x64";
+    if (arch === "arm64") return "win32-arm64";
+  }
 
   throw new UnsupportedPlatformError(
     `Unsupported host platform: ${platform}-${arch}.\n` +

@@ -32,9 +32,9 @@ architecture, and (on Linux) libc.
 | macOS arm64 | `@org/qemu-darwin-arm64` |
 | macOS x64 | `@org/qemu-darwin-x64` |
 | Windows x64 | `@org/qemu-win32-x64` |
+| Windows arm64 | `@org/qemu-win32-arm64` |
 
-Planned after MVP: `linux-x64-musl`, `linux-arm64-musl`, `win32-arm64`,
-`freebsd-x64`.
+Planned after MVP: `linux-x64-musl`, `linux-arm64-musl`, `freebsd-x64`.
 
 **Guest targets** shipped in each platform package: `qemu-system-x86_64`,
 `qemu-system-aarch64`, and `qemu-img`. More targets (`riscv64`, `arm`,

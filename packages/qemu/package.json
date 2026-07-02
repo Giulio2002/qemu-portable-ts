@@ -29,14 +29,15 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.test.json --noEmit",
     "pretest": "tsc -p tsconfig.test.json",
-    "test": "node --test \"build/test/*.test.js\""
+    "test": "node run-tests.js"
   },
   "optionalDependencies": {
     "@org/qemu-linux-x64": "0.1.0",
     "@org/qemu-linux-arm64": "0.1.0",
     "@org/qemu-darwin-arm64": "0.1.0",
     "@org/qemu-darwin-x64": "0.1.0",
-    "@org/qemu-win32-x64": "0.1.0"
+    "@org/qemu-win32-x64": "0.1.0",
+    "@org/qemu-win32-arm64": "0.1.0"
   },
   "license": "MIT"
 }

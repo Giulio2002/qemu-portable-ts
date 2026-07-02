@@ -30,6 +30,14 @@ jobs:
             package: qemu-win32-x64
             host: win32-x64
             script: scripts/build-qemu-windows.ps1
+            msystem: MINGW64
+            mingw_prefix: mingw-w64-x86_64
+          - os: windows-11-arm
+            package: qemu-win32-arm64
+            host: win32-arm64
+            script: scripts/build-qemu-windows.ps1
+            msystem: CLANGARM64
+            mingw_prefix: mingw-w64-clang-aarch64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -53,14 +61,16 @@ jobs:
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          # MINGW64 for x64; CLANGARM64 for Windows on ARM (there is no
+          # native mingw-w64 GCC for aarch64, so the clang toolchain is used).
+          msystem: ${{ matrix.msystem }}
           location: C:\msys64
           install: >-
             base-devel git python
-            mingw-w64-x86_64-toolchain mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-meson mingw-w64-x86_64-pkg-config
-            mingw-w64-x86_64-glib2 mingw-w64-x86_64-pixman
-            mingw-w64-x86_64-libslirp
+            ${{ matrix.mingw_prefix }}-toolchain ${{ matrix.mingw_prefix }}-ninja
+            ${{ matrix.mingw_prefix }}-meson ${{ matrix.mingw_prefix }}-pkg-config
+            ${{ matrix.mingw_prefix }}-glib2 ${{ matrix.mingw_prefix }}-pixman
+            ${{ matrix.mingw_prefix }}-libslirp
 
       - name: Build QEMU and assemble package (Unix)
         if: runner.os != 'Windows'
@@ -69,6 +79,11 @@ jobs:
       - name: Build QEMU and assemble package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          # Consumed by build-qemu-windows.ps1 / collect-runtime-deps.ts so the
+          # right MSYS2 environment and DLL directory are used per architecture.
+          QEMU_MSYS_ENV: ${{ matrix.msystem }}
+          QEMU_DLL_SEARCH_PATH: C:\msys64\${{ matrix.msystem == 'CLANGARM64' && 'clangarm64' || 'mingw64' }}\bin
         run: ${{ matrix.script }} -PackageDir packages/${{ matrix.package }}
 
       - name: Compliance gate

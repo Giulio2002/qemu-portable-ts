@@ -39,7 +39,9 @@ if (-not (Test-Path "qemu-$QemuVersion")) {
 
 # --- Configure and build under MSYS2 ------------------------------------------
 # QEMU's Windows build runs through the MSYS2 shell; --enable-whpx is implied
-# by the w64 target when the SDK is present.
+# by the w64 target when the SDK is present. The MSYS2 environment is selected
+# per architecture: MINGW64 for x64, CLANGARM64 for Windows on ARM.
+$MsysEnv = if ($env:QEMU_MSYS_ENV) { $env:QEMU_MSYS_ENV } else { "MINGW64" }
 $ConfigureArgs = "--target-list=$TargetList --disable-docs --disable-werror --disable-gtk --disable-sdl --enable-slirp"
 $BuildScript = @"
 set -e
@@ -52,6 +54,8 @@ mkdir -p build && cd build
 ../configure $ConfigureArgs
 make -j`$(nproc)
 "@
+# MSYSTEM tells the MSYS2 login shell which toolchain environment to load.
+$env:MSYSTEM = $MsysEnv
 & C:\msys64\usr\bin\bash.exe -lc $BuildScript
 
 # --- Assemble the package -------------------------------------------------------
