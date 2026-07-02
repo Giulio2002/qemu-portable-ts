@@ -1,0 +1,42 @@
+{
+  "name": "@org/qemu",
+  "version": "0.1.0",
+  "description": "TypeScript API for vendored QEMU binaries",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "qemu-ts": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "COMPLIANCE.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "pretest": "tsc -p tsconfig.test.json",
+    "test": "node --test \"build/test/*.test.js\""
+  },
+  "optionalDependencies": {
+    "@org/qemu-linux-x64": "0.1.0",
+    "@org/qemu-linux-arm64": "0.1.0",
+    "@org/qemu-darwin-arm64": "0.1.0",
+    "@org/qemu-darwin-x64": "0.1.0",
+    "@org/qemu-win32-x64": "0.1.0"
+  },
+  "license": "MIT"
+}

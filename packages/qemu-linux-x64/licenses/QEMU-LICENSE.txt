@@ -1,0 +1,18 @@
+QEMU licensing summary
+======================
+
+The QEMU distribution as a whole is covered by the GNU General Public
+License, version 2 ("GPL-2.0-only" as distributed here). See GPL-2.0.txt in
+this directory for the full license text.
+
+Individual QEMU source files carry a range of compatible licenses, including
+GPL-2.0-or-later, LGPL-2.1, BSD, and MIT. The combination that makes up the
+binaries shipped in this package is distributed under the terms of the
+GPL version 2.
+
+Upstream licensing documentation:
+  https://www.qemu.org/docs/master/about/license.html
+
+The exact QEMU version, git ref, configure arguments, and source archive
+checksum used to produce the binaries in this package are recorded in
+build-info.json at the package root.

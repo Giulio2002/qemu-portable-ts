@@ -1,0 +1,25 @@
+{
+  "name": "@org/qemu-linux-x64",
+  "version": "0.1.0",
+  "description": "Vendored QEMU binaries for Linux x64 glibc",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": "glibc",
+  "type": "module",
+  "files": [
+    "bin",
+    "lib",
+    "share/qemu",
+    "licenses",
+    "build-info.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/org/qemu-ts.git"
+  },
+  "license": "GPL-2.0-only"
+}

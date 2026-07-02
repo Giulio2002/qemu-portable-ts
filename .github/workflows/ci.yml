@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+        node: [20, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npm test
+
+  package-metadata:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate compliance/license files in platform packages
+        run: node --experimental-strip-types scripts/verify-license-files.ts
+      - name: Validate core package pack contents
+        run: |
+          npm ci
+          npm run build
+          cd packages/qemu
+          npm pack --dry-run --json > /tmp/pack.json
+          node -e "
+            const files = require('/tmp/pack.json')[0].files.map(f => f.path);
+            const required = ['dist/index.js', 'dist/index.d.ts', 'dist/cli.js', 'package.json'];
+            const missing = required.filter(f => !files.includes(f));
+            if (missing.length) { console.error('missing from pack:', missing); process.exit(1); }
+            const leaked = files.filter(f => f.startsWith('src/') || f.startsWith('test/') || f.startsWith('build/'));
+            if (leaked.length) { console.error('unexpected files in pack:', leaked); process.exit(1); }
+            console.log('pack contents OK:', files.length, 'files');
+          "

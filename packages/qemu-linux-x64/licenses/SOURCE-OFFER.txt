@@ -1,0 +1,26 @@
+WRITTEN OFFER FOR SOURCE CODE
+=============================
+
+This npm package (@org/qemu-linux-x64) contains binaries of QEMU, licensed under the
+GNU General Public License version 2 (see GPL-2.0.txt).
+
+Complete corresponding source code — the exact QEMU source archive, all
+applied patches, and the build scripts used to produce these binaries — is
+published alongside every release:
+
+  1. GitHub Release assets for the matching version tag:
+       https://github.com/org/qemu-ts/releases/tag/v0.1.0
+     containing qemu-<version>.tar.xz, patches/, build-scripts/, and
+     checksums.txt.
+
+  2. The third_party/qemu directory of the repository at the same tag:
+       https://github.com/org/qemu-ts
+
+The QEMU version, git ref, configure arguments, and SHA-256 checksum of the
+source archive used for this exact package are recorded in build-info.json
+at the package root.
+
+Alternatively, you may obtain the source on physical media by writing to the
+maintainers (see the repository README for contact details). This offer is
+valid for at least three years from the publication date of this package, to
+any third party, at no charge beyond the cost of distribution.

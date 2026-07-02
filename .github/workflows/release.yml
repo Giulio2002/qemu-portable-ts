@@ -1,0 +1,100 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  # Required for npm provenance (trusted publishing).
+  id-token: write
+
+jobs:
+  build-binaries:
+    uses: ./.github/workflows/build-binaries.yml
+
+  publish:
+    needs: build-binaries
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Download built platform packages
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+      # download-artifact restores each artifact into packages/<name>/,
+      # matching the workspace layout exactly.
+
+      - name: Build core package
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+      - name: Compliance gate (blocking)
+        run: |
+          node --experimental-strip-types scripts/verify-license-files.ts
+          for pkg in packages/qemu-*/; do
+            node --experimental-strip-types scripts/verify-binary-package.ts "$pkg"
+          done
+
+      - name: npm pack test (fresh consumer install)
+        run: |
+          set -e
+          mkdir -p /tmp/pack && cd /tmp/pack
+          npm pack "$GITHUB_WORKSPACE/packages/qemu"
+          npm pack "$GITHUB_WORKSPACE/packages/qemu-linux-x64"
+          mkdir consumer && cd consumer
+          npm init -y > /dev/null
+          npm install ../org-qemu-*.tgz ../org-qemu-linux-x64-*.tgz
+          node -e "const q = require('@org/qemu'); console.log(q.getHostPlatform()); console.log(q.resolveQemuBinary('qemu-img').path);"
+          npx qemu-ts run qemu-img -- --version
+          npx qemu-ts run qemu-system-x86_64 -- -machine help
+
+      # Binary packages publish first so the core package's
+      # optionalDependencies already exist in the registry (project.md §14.3).
+      - name: Publish platform packages
+        run: |
+          for pkg in qemu-linux-x64 qemu-linux-arm64 qemu-darwin-arm64 qemu-darwin-x64 qemu-win32-x64; do
+            npm publish "packages/$pkg" --provenance --access public
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish core package
+        run: npm publish packages/qemu --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Assemble source-compliance archive
+        run: |
+          set -e
+          QEMU_VERSION="$(cat third_party/qemu/QEMU_VERSION)"
+          mkdir -p /tmp/source-release
+          curl -fL --retry 3 -o "/tmp/source-release/qemu-${QEMU_VERSION}.tar.xz" \
+            "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz"
+          (cd /tmp/source-release && sha256sum -c "$GITHUB_WORKSPACE/third_party/qemu/checksums/qemu-${QEMU_VERSION}.tar.xz.sha256")
+          cp -R third_party/qemu/patches /tmp/source-release/patches
+          mkdir -p /tmp/source-release/build-scripts
+          cp scripts/build-qemu-*.sh scripts/build-qemu-*.ps1 \
+             scripts/collect-runtime-deps.ts scripts/generate-build-info.ts \
+             /tmp/source-release/build-scripts/
+          (cd /tmp/source-release && find . -type f -exec sha256sum {} \; > checksums.txt)
+
+      - name: Create GitHub Release with source archive
+        uses: softprops/action-gh-release@v2
+        with:
+          body: |
+            QEMU upstream version: $(cat third_party/qemu/QEMU_VERSION)
+            Platforms: linux-x64, linux-arm64, darwin-arm64, darwin-x64, win32-x64
+
+            The attached source archive, patches, and build scripts are the
+            complete corresponding source for the GPL-licensed binaries in the
+            @org/qemu-* packages of this release.
+          files: |
+            /tmp/source-release/*

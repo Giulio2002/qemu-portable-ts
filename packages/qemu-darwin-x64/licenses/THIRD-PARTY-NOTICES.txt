@@ -1,0 +1,12 @@
+THIRD-PARTY NOTICES
+===================
+
+This package redistributes QEMU and the dynamic libraries it links against.
+
+This file is (re)generated at package build time by
+scripts/collect-runtime-deps.ts, which records every bundled runtime
+dependency and its license. A binary package MUST NOT be published while
+this file still contains only this placeholder text — the release compliance
+gate (scripts/verify-license-files.ts) enforces that.
+
+Bundled components and licenses: (populated at build time)

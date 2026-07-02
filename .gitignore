@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+*.tgz
+*.log
+.DS_Store
+
+# Native build outputs (populated by scripts/build-qemu-*.sh, never committed)
+packages/qemu-*/bin/*
+packages/qemu-*/lib/*
+packages/qemu-*/share/qemu/*
+packages/qemu-*/build-info.json
+!packages/qemu-*/bin/.gitkeep
+!packages/qemu-*/lib/.gitkeep
+!packages/qemu-*/share/qemu/.gitkeep
+
+third_party/qemu/source/

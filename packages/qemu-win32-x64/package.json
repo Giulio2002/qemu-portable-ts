@@ -1,0 +1,23 @@
+{
+  "name": "@org/qemu-win32-x64",
+  "version": "0.1.0",
+  "description": "Vendored QEMU binaries for Windows x64",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "type": "module",
+  "files": [
+    "bin",
+    "share/qemu",
+    "licenses",
+    "build-info.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/org/qemu-ts.git"
+  },
+  "license": "GPL-2.0-only"
+}
