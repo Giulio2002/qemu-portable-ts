@@ -32,7 +32,7 @@
     "script": "scripts/build-qemu-macos.sh"
   },
   {
-    "os": "macos-13",
+    "os": "macos-15-intel",
     "package": "qemu-darwin-x64",
     "host": "darwin-x64",
     "script": "scripts/build-qemu-macos.sh"
