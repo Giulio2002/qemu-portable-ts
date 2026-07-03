@@ -91,6 +91,14 @@ jobs:
             // npm name qemu-portable-<platform> -> workspace dir qemu-<platform>
             for (const name of Object.keys(deps)) console.log(name.replace('qemu-portable-', 'qemu-'));
           "); do
+            name=$(node -p "require('./packages/$dir/package.json').name")
+            version=$(node -p "require('./packages/$dir/package.json').version")
+            # Idempotent: a retried release must skip what already made it to
+            # the registry (a partial publish otherwise wedges every retry).
+            if npm view "$name@$version" version > /dev/null 2>&1; then
+              echo "$name@$version already published — skipping"
+              continue
+            fi
             # Leading ./ is required: a bare "packages/<dir>" is parsed by
             # npm as a GitHub owner/repo spec, not a local path.
             npm publish "./packages/$dir" --provenance --access public
@@ -99,7 +107,14 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish core package
-        run: npm publish ./packages/qemu --provenance --access public
+        run: |
+          set -e
+          version=$(node -p "require('./packages/qemu/package.json').version")
+          if npm view "qemu-portable@$version" version > /dev/null 2>&1; then
+            echo "qemu-portable@$version already published — skipping"
+          else
+            npm publish ./packages/qemu --provenance --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
