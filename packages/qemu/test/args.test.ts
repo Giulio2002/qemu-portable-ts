@@ -155,6 +155,35 @@ test("qmp disabled emits nothing", () => {
   assert.equal(args.indexOf("-qmp"), -1);
 });
 
+test("guestAgent config emits the virtio-serial guest agent channel", () => {
+  const { args } = buildQemuSystemArgs(
+    { target: "x86_64", guestAgent: { socketPath: "/tmp/qga.sock" } },
+    "linux"
+  );
+  const chardevIdx = args.indexOf("-chardev");
+  assert.equal(args[chardevIdx + 1], "socket,path=/tmp/qga.sock,server=on,wait=off,id=qga0");
+  assert.ok(args.includes("virtio-serial"));
+  assert.ok(
+    args.includes("virtserialport,chardev=qga0,name=org.qemu.guest_agent.0")
+  );
+});
+
+test("guestAgent: true without a socket path throws (pure builder needs it explicit)", () => {
+  assert.throws(
+    () => buildQemuSystemArgs({ target: "x86_64", guestAgent: true }, "linux"),
+    InvalidVmConfigError
+  );
+});
+
+test("guestAgent socket path with commas is escaped", () => {
+  const { args } = buildQemuSystemArgs(
+    { target: "x86_64", guestAgent: { socketPath: "/tmp/a,b/qga.sock" } },
+    "linux"
+  );
+  const chardevIdx = args.indexOf("-chardev");
+  assert.ok(args[chardevIdx + 1].includes("path=/tmp/a,,b/qga.sock"));
+});
+
 test("invalid smp throws InvalidVmConfigError", () => {
   assert.throws(
     () => buildQemuSystemArgs({ target: "x86_64", smp: 0 }, "linux"),

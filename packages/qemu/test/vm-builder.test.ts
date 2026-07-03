@@ -27,6 +27,29 @@ test("buildVmArgs resolves the right system command for the target", () => {
   assert.ok(built.args.includes("-m"));
 });
 
+test("createVm with guestAgent:true provisions a socket and wires the channel", () => {
+  const vm = createVm(
+    { target: "x86_64", guestAgent: true },
+    { resolveBinary: fakeResolved }
+  );
+  assert.ok(vm.guestAgentSocketPath, "expected an auto-provisioned socket path");
+  const built = vm.build();
+  assert.ok(built.args.includes("virtio-serial"));
+  assert.ok(
+    built.args.some((a) => a.includes(`path=${vm.guestAgentSocketPath}`)),
+    "chardev should reference the provisioned socket"
+  );
+});
+
+test("vm.exec() rejects when guestAgent was not enabled", async () => {
+  const vm = createVm({ target: "x86_64" }, { resolveBinary: fakeResolved });
+  assert.equal(vm.guestAgentSocketPath, undefined);
+  await assert.rejects(vm.exec("ls"), (err: Error) => {
+    assert.match(err.message, /guest agent/i);
+    return true;
+  });
+});
+
 test("createVm().build() exposes auditable args without starting anything", () => {
   const vm = createVm(
     {

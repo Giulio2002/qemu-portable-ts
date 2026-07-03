@@ -41,6 +41,15 @@ export interface QmpConfig {
   wait?: boolean;
 }
 
+export interface GuestAgentConfig {
+  /**
+   * Host socket path the guest agent channel is exposed on. `createVm` fills
+   * this in automatically when you pass `guestAgent: true`; the pure arg
+   * builders require it explicitly.
+   */
+  socketPath?: string;
+}
+
 export interface VmConfig {
   target: GuestTarget;
   name?: string;
@@ -57,6 +66,13 @@ export interface VmConfig {
   cdrom?: string;
   kernel?: KernelBootConfig;
   network?: NetworkConfig;
+  /**
+   * Wire up the QEMU Guest Agent channel so `vm.exec()` can run commands
+   * inside the guest. `true` lets `createVm` provision a socket path for you;
+   * an object lets you pin the socket path. Requires `qemu-guest-agent`
+   * running in the guest OS.
+   */
+  guestAgent?: boolean | GuestAgentConfig;
   extraArgs?: string[];
 }
 
@@ -185,6 +201,29 @@ function qmpArgs(qmp: QmpConfig): string[] {
   ];
 }
 
+function guestAgentArgs(config: boolean | GuestAgentConfig): string[] {
+  const cfg: GuestAgentConfig = typeof config === "object" ? config : {};
+  if (!cfg.socketPath) {
+    throw new InvalidVmConfigError(
+      "guestAgent requires a socketPath. createVm() provisions one for you " +
+        "when you pass `guestAgent: true`; the pure arg builders need it " +
+        "explicit, e.g. `guestAgent: { socketPath: '/tmp/qga.sock' }`."
+    );
+  }
+  // Standard QEMU Guest Agent wiring over a virtio-serial port. The guest's
+  // qemu-guest-agent connects to org.qemu.guest_agent.0 on its side; we speak
+  // to it through the host socket. server=on,wait=off so QEMU creates the
+  // socket and boots without blocking on a connection.
+  return [
+    "-chardev",
+    `socket,path=${escapeQemuOptionValue(cfg.socketPath)},server=on,wait=off,id=qga0`,
+    "-device",
+    "virtio-serial",
+    "-device",
+    "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
+  ];
+}
+
 function serialArgs(serial: NonNullable<VmConfig["serial"]>): string[] {
   if (serial === "stdio") return ["-serial", "stdio"];
   if (serial === "none") return ["-serial", "none"];
@@ -227,6 +266,7 @@ export function buildQemuSystemArgs(
 
   if (config.serial) args.push(...serialArgs(config.serial));
   if (config.qmp) args.push(...qmpArgs(config.qmp));
+  if (config.guestAgent) args.push(...guestAgentArgs(config.guestAgent));
 
   (config.disks ?? []).forEach((disk, i) => args.push(...diskArgs(disk, i)));
   if (config.cdrom) args.push("-cdrom", config.cdrom);

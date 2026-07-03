@@ -11,7 +11,7 @@
 
 import { formatDiagnostics, getQemuDiagnostics } from "./diagnostics";
 import { QemuError } from "./errors";
-import { MVP_COMMANDS, QemuCommand } from "./platform";
+import { KNOWN_QEMU_COMMANDS, QemuCommandName } from "./platform";
 import { spawnQemu } from "./process";
 import { resolveQemuBinary } from "./resolve";
 import { getQemuVersion } from "./version";
@@ -24,7 +24,8 @@ Usage:
   qemu-ts which <command>                   Print resolved vendored binary path
   qemu-ts run <command> -- <qemu args...>   Run a vendored binary with raw args
 
-Commands: ${MVP_COMMANDS.join(", ")}, qemu-system-riscv64
+Common commands: ${KNOWN_QEMU_COMMANDS.join(", ")}
+(any binary shipped in the platform package can be run, e.g. qemu-io, qemu-nbd)
 
 Notes:
   - "run" requires "--" before raw QEMU arguments.
@@ -32,25 +33,14 @@ Notes:
   - "run" exits with the same code as the QEMU process.
 `;
 
-const KNOWN_COMMANDS: QemuCommand[] = [
-  "qemu-system-x86_64",
-  "qemu-system-aarch64",
-  "qemu-system-riscv64",
-  "qemu-img",
-];
-
-function parseQemuCommand(value: string | undefined, context: string): QemuCommand {
+// No allowlist: accept any command name. The resolver still refuses names
+// that would escape the package's bin/ directory.
+function parseQemuCommand(value: string | undefined, context: string): QemuCommandName {
   if (!value) {
     process.stderr.write(`Missing QEMU command for "${context}".\n\n${USAGE}`);
     process.exit(2);
   }
-  if (!KNOWN_COMMANDS.includes(value as QemuCommand)) {
-    process.stderr.write(
-      `Unknown QEMU command "${value}". Known commands: ${KNOWN_COMMANDS.join(", ")}\n`
-    );
-    process.exit(2);
-  }
-  return value as QemuCommand;
+  return value;
 }
 
 async function main(argv: string[]): Promise<number> {

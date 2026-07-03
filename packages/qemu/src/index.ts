@@ -8,4 +8,5 @@ export * from "./args";
 export * from "./vm";
 export * from "./qmp/protocol";
 export * from "./qmp/client";
+export * from "./qmp/guest-agent";
 export * from "./errors";

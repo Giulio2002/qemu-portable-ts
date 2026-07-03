@@ -1,16 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { delimiter, dirname, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 
 import { QemuBinaryNotFoundError, QemuInvalidCommandError } from "./errors";
 import {
   HostPlatform,
-  MVP_COMMANDS,
   PLATFORM_PACKAGES,
-  QEMU_COMMANDS,
-  QemuCommand,
+  QemuCommandName,
   executableName,
   getHostPlatform,
-  isQemuCommand,
   isWindowsPlatform,
 } from "./platform";
 
@@ -19,7 +16,7 @@ export interface QemuBuildInfo {
   qemuGitRef: string;
   buildHost: string;
   builtAt: string;
-  targets: QemuCommand[];
+  targets: QemuCommandName[];
   configureArgs: string[];
   runtimeDependencies: string[];
   sourceArchiveSha256?: string;
@@ -27,7 +24,7 @@ export interface QemuBuildInfo {
 }
 
 export interface ResolvedQemuBinary {
-  command: QemuCommand;
+  command: QemuCommandName;
   path: string;
   packageName: string;
   packageRoot: string;
@@ -50,6 +47,31 @@ export interface ResolveQemuOptions {
    * standard node_modules resolution relative to this package.
    */
   searchPaths?: string[];
+}
+
+/**
+ * Ensures a command names a binary inside a package's bin/ directory rather
+ * than a path that escapes it. This is not an allowlist — any name is fine —
+ * it only rejects path separators, `..`, absolute paths, and NUL bytes so
+ * `join(packageRoot, "bin", command)` cannot resolve outside bin/.
+ */
+export function assertContainedCommandName(command: string): void {
+  if (
+    command.length === 0 ||
+    command === "." ||
+    command === ".." ||
+    command.includes("\0") ||
+    command !== basename(command)
+  ) {
+    throw new QemuInvalidCommandError(
+      `Invalid QEMU command name ${JSON.stringify(command)}.\n` +
+        `The resolver only resolves a binary inside the platform package's ` +
+        `bin/ directory, so the command must be a bare file name (no path ` +
+        `separators, no "..", not absolute).\n` +
+        `To run a binary by absolute path, spawn it yourself or pass ` +
+        `preferSystem to use one from PATH.`
+    );
+  }
 }
 
 /**
@@ -87,7 +109,7 @@ function missingPackageMessage(
 }
 
 function missingBinaryMessage(
-  command: QemuCommand,
+  command: QemuCommandName,
   packageName: string,
   binaryPath: string
 ): string {
@@ -134,18 +156,17 @@ function findOnPath(
  * never consult PATH. Set `preferSystem: true` to check PATH first.
  */
 export function resolveQemuBinary(
-  command: QemuCommand,
+  command: QemuCommandName,
   options: Omit<ResolveQemuOptions, "command"> = {}
 ): ResolvedQemuBinary {
-  // Enforce the allowlist before deriving any path: the QemuCommand type is
-  // erased at runtime, so a caller forwarding untrusted input could otherwise
-  // smuggle "../../bin/sh" and have us resolve + spawn an arbitrary binary.
-  if (!isQemuCommand(command)) {
-    throw new QemuInvalidCommandError(
-      `Unknown QEMU command ${JSON.stringify(command)}.\n` +
-        `Allowed commands: ${QEMU_COMMANDS.join(", ")}.`
-    );
-  }
+  // No allowlist: any command name is accepted. The only constraint is that
+  // it names a binary *inside* the platform package's bin/ directory — a bare
+  // file name with no path separators. This keeps the resolver's contract
+  // (resolve a vendored binary) intact and stops "../../bin/sh" style traversal
+  // from turning into arbitrary host-binary execution, without dictating which
+  // QEMU commands you may run. To run a binary by absolute path, spawn it
+  // yourself or use `preferSystem`.
+  assertContainedCommandName(command);
   const platform = options.platform ?? getHostPlatform();
   const packageName = PLATFORM_PACKAGES[platform];
   const exe = executableName(command, platform);
@@ -213,15 +234,21 @@ export function listAvailableBinaries(
   const binDir = join(packageRoot, "bin");
   if (!existsSync(binDir)) return [];
 
-  const suffix = isWindowsPlatform(platform) ? ".exe" : "";
-  const known = new Set<string>(
-    [...MVP_COMMANDS, "qemu-system-riscv64"].map((c) => `${c}${suffix}`)
-  );
-
+  // List every qemu-* binary the package actually ships, not a curated set —
+  // qemu-io, qemu-nbd, extra qemu-system-* targets all show up if present.
+  const isWindows = isWindowsPlatform(platform);
+  const suffix = isWindows ? ".exe" : "";
   const results: ResolvedQemuBinary[] = [];
   for (const entry of readdirSync(binDir)) {
-    if (!known.has(entry)) continue;
-    const command = (suffix ? entry.slice(0, -suffix.length) : entry) as QemuCommand;
+    if (!entry.startsWith("qemu-")) continue;
+    if (isWindows) {
+      if (!entry.endsWith(".exe")) continue; // skip bundled .dll files
+    } else if (entry.includes(".")) {
+      continue; // skip non-executable artifacts on POSIX
+    }
+    const command = suffix && entry.endsWith(suffix)
+      ? entry.slice(0, -suffix.length)
+      : entry;
     results.push(resolveQemuBinary(command, { ...options, platform }));
   }
   return results;

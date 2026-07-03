@@ -22,8 +22,11 @@ isolation boundary that QEMU itself doesn't provide.
   option string, so a hostile value in a *typed config field* cannot inject
   extra QEMU options.
 - **Path traversal / arbitrary binary execution via the command name.** The
-  resolver enforces a runtime allowlist of QEMU command names before deriving
-  any filesystem path.
+  resolver does not restrict *which* QEMU commands you may run — that's your
+  call — but it requires a command to name a binary *inside* the platform
+  package's `bin/` directory (a bare file name, no path separators, no `..`,
+  not absolute). So `"../../bin/sh"` is refused, while `qemu-io`, `qemu-nbd`,
+  or any other binary the package actually ships resolves normally.
 - **Accidental use of a host QEMU.** The resolver never falls back to a
   system QEMU on `PATH` unless you explicitly pass `preferSystem: true`.
 - **A malicious or desynchronized QMP peer.** The QMP framer bounds how much
@@ -75,7 +78,7 @@ runs — that is inherent to running a VM.
 
 | Input | Handling |
 |---|---|
-| `command` (resolver/process) | **Allowlisted** against the known QEMU commands; unknown → `QemuInvalidCommandError`. |
+| `command` (resolver/process) | **Contained**, not allowlisted: any name is allowed, but it must resolve inside the package `bin/` (no path separators/`..`/absolute) → traversal throws `QemuInvalidCommandError`. |
 | `disk.path`, `disk.format`, `disk.interface` | **Escaped** (commas doubled) before entering the `-drive` option string. |
 | `network.hostForwards[].protocol` | **Validated** to `tcp`/`udp`. |
 | `network.hostForwards[].hostPort` / `guestPort` | **Validated** integer in `0..65535`. |
@@ -106,6 +109,12 @@ input.
 - [ ] **Keep QMP local.** Use a per-VM `socketPath` in a directory only your
       user can read; the client has no TCP option by design. Do not proxy the
       socket onto a network interface.
+- [ ] **Treat the guest-agent socket like QMP.** `guestAgent`/`vm.exec` expose
+      a local Unix socket that runs commands in the guest (`guest-exec`). The
+      auto-provisioned path lives under a private `mkdtemp` directory; if you
+      set your own `socketPath`, keep it in a directory only your user can
+      read, and never expose it over a network. Note that `guest-exec` runs in
+      the *guest*, not the host — but it is still a privileged channel.
 - [ ] **Audit before you launch.** Call `vm.build().args` and log/inspect the
       exact argv, especially if any field derives from external input.
 - [ ] **Add OS-level containment** if you need a real boundary: seccomp, a
@@ -187,7 +196,7 @@ Security fixes applied to the library itself (as opposed to QEMU updates):
 | Area | Issue | Resolution |
 |---|---|---|
 | VM builder (`args.ts`) | `hostForwards` addresses/protocol were interpolated into the `-netdev` string unescaped, allowing option injection (up to `guestfwd=...-cmd:` host command execution) via a comma. | Validate protocol (`tcp`/`udp`), ports (`0..65535`), and addresses (conservative IPv4/IPv6/hostname set); escape all interpolated `-drive` fields. |
-| Resolver (`resolve.ts`) | `command` had no runtime allowlist; a `../`-bearing string could resolve/spawn an arbitrary host binary. | Enforce `isQemuCommand` before deriving any path; throw `QemuInvalidCommandError`. |
+| Resolver (`resolve.ts`) | `command` had no runtime check; a `../`-bearing string could resolve/spawn an arbitrary host binary. | Require the command to name a binary inside `bin/` (path-containment, not an allowlist) via `assertContainedCommandName`; throw `QemuInvalidCommandError` on traversal. Command *selection* is left to the caller. |
 | QMP client (`qmp/client.ts`) | Responses were correlated FIFO; a timed-out request removed from the queue misaligned all later responses. | Correlate by per-command `id`. |
 | QMP framer (`qmp/protocol.ts`) | Unbounded line buffering allowed a memory-exhaustion DoS from a hostile peer. | Cap the unterminated-line buffer (`maxLineBytes`); throw `QmpProtocolError` when exceeded. |
 

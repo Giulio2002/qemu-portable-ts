@@ -1,10 +1,10 @@
 import { QemuCommandError } from "./errors";
-import { QemuCommand } from "./platform";
+import { QemuCommandName } from "./platform";
 import { QemuRunOptions, execQemu } from "./process";
 import { ResolvedQemuBinary, resolveQemuBinary } from "./resolve";
 
 export interface QemuVersionInfo {
-  command: QemuCommand;
+  command: QemuCommandName;
   qemuVersion: string;
   rawOutput: string;
   binary: ResolvedQemuBinary;
@@ -21,7 +21,7 @@ export function parseQemuVersionOutput(output: string): string | undefined {
 
 /** Runs `<command> --version` against the vendored binary and parses it. */
 export async function getQemuVersion(
-  command: QemuCommand = "qemu-img",
+  command: QemuCommandName = "qemu-img",
   options: QemuRunOptions = {}
 ): Promise<QemuVersionInfo> {
   const binary = options.resolved ?? resolveQemuBinary(command, options.resolve);

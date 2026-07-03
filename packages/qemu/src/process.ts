@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 
 import { QemuCommandError, QemuTimeoutError } from "./errors";
-import { QemuCommand } from "./platform";
+import { QemuCommandName } from "./platform";
 import { ResolveQemuOptions, ResolvedQemuBinary, resolveQemuBinary } from "./resolve";
 
 export interface QemuRunOptions {
@@ -33,7 +33,7 @@ export interface QemuExitResult {
 
 export interface QemuProcess {
   child: ChildProcess;
-  command: QemuCommand;
+  command: QemuCommandName;
   binaryPath: string;
   args: string[];
   pid?: number;
@@ -73,7 +73,7 @@ export function buildLibraryEnv(
 
 function wrapChildProcess(
   child: ChildProcess,
-  command: QemuCommand,
+  command: QemuCommandName,
   binaryPath: string,
   args: string[],
   timeoutMs?: number
@@ -145,7 +145,7 @@ function wrapChildProcess(
  * vendored firmware/keymap data is used instead of any host installation.
  */
 export function spawnQemu(
-  command: QemuCommand,
+  command: QemuCommandName,
   args: string[],
   options: QemuRunOptions = {}
 ): QemuProcess {
@@ -190,7 +190,7 @@ export function spawnQemu(
  * Does not throw on non-zero exit; callers decide what a failure means.
  */
 export async function execQemu(
-  command: QemuCommand,
+  command: QemuCommandName,
   args: string[],
   options: QemuRunOptions = {}
 ): Promise<QemuExitResult> {
@@ -203,7 +203,7 @@ export async function execQemu(
 
 /** Like execQemu, but throws QemuCommandError on non-zero exit. */
 export async function execQemuOrThrow(
-  command: QemuCommand,
+  command: QemuCommandName,
   args: string[],
   options: QemuRunOptions = {}
 ): Promise<QemuExitResult> {

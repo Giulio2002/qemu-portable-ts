@@ -48,6 +48,20 @@ export class QmpProtocolError extends QemuError {
   }
 }
 
+/**
+ * The QEMU Guest Agent channel errored, timed out, or the guest agent is not
+ * responding (e.g. not installed/running in the guest, or the guest has not
+ * finished booting).
+ */
+export class GuestAgentError extends QemuError {
+  readonly code = "ERR_QEMU_GUEST_AGENT";
+  readonly errorClass?: string;
+  constructor(message: string, errorClass?: string) {
+    super(message);
+    this.errorClass = errorClass;
+  }
+}
+
 /** A VM configuration cannot be translated into valid QEMU arguments. */
 export class InvalidVmConfigError extends QemuError {
   readonly code = "ERR_QEMU_INVALID_VM_CONFIG";

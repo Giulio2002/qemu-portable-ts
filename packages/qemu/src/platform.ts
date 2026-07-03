@@ -24,6 +24,15 @@ export type QemuToolCommand = "qemu-img";
 
 export type QemuCommand = QemuSystemCommand | QemuToolCommand;
 
+/**
+ * A QEMU command name to resolve/run. The named commands above get editor
+ * autocomplete, but any string is accepted — the resolver does not restrict
+ * you to a curated set, it only refuses names that would escape the package's
+ * bin/ directory. Whatever binaries a platform package ships (qemu-io,
+ * qemu-nbd, additional qemu-system-* targets, …) are yours to run.
+ */
+export type QemuCommandName = QemuCommand | (string & {});
+
 export type AccelerationMode = "auto" | "tcg" | "kvm" | "hvf" | "whpx";
 
 export type Libc = "glibc" | "musl";
@@ -36,21 +45,21 @@ export const MVP_COMMANDS: QemuCommand[] = [
 ];
 
 /**
- * Every command the library will ever resolve or spawn. The QemuCommand type
- * is compile-time only; this set is the runtime allowlist enforced at the
- * resolver boundary so an untrusted command string can never traverse out of
- * a package's bin/ directory into an arbitrary host executable.
+ * The commands the typed API names and that platform packages ship by
+ * default. This is informational (used for CLI help and discovery) — it is
+ * NOT an allowlist. The resolver will run any binary present in a package's
+ * bin/; command selection is the caller's responsibility.
  */
-export const QEMU_COMMANDS: readonly QemuCommand[] = [
+export const KNOWN_QEMU_COMMANDS: readonly QemuCommand[] = [
   "qemu-system-x86_64",
   "qemu-system-aarch64",
   "qemu-system-riscv64",
   "qemu-img",
 ];
 
-/** Runtime type guard: is `value` one of the known QEMU commands? */
-export function isQemuCommand(value: unknown): value is QemuCommand {
-  return typeof value === "string" && (QEMU_COMMANDS as readonly string[]).includes(value);
+/** True if `value` is one of the commands the typed API names. */
+export function isKnownQemuCommand(value: unknown): value is QemuCommand {
+  return typeof value === "string" && (KNOWN_QEMU_COMMANDS as readonly string[]).includes(value);
 }
 
 /** Maps a host platform to the npm package that vendors its binaries. */
@@ -153,7 +162,7 @@ export function isWindowsPlatform(platform: HostPlatform): boolean {
 
 /** Executable file name for a command on a platform (adds .exe on Windows). */
 export function executableName(
-  command: QemuCommand,
+  command: QemuCommandName,
   platform: HostPlatform
 ): string {
   return isWindowsPlatform(platform) ? `${command}.exe` : command;

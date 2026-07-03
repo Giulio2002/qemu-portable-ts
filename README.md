@@ -85,6 +85,38 @@ const proc = vm.start({ stdio: "inherit" });
 await proc.wait();
 ```
 
+### Running commands inside the guest (`vm.exec`)
+
+Enable the QEMU Guest Agent and run commands in the guest, capturing output —
+like `docker exec`, but for a full VM:
+
+```ts
+import { createVm } from "@org/qemu";
+
+const vm = createVm({
+  target: "x86_64",
+  memory: "2G",
+  acceleration: "auto",
+  disks: [{ path: "./ubuntu-cloud.qcow2", format: "qcow2", interface: "virtio" }],
+  guestAgent: true,          // wires the guest-agent virtio-serial channel
+});
+vm.start();
+
+// A string runs through a shell, so &&, pipes, and redirection work:
+const { exitCode, stdout } = await vm.exec("ls -la / && cd /etc && cat os-release");
+console.log(exitCode, stdout);
+
+// An argv array runs a binary directly, no shell:
+await vm.exec(["/usr/bin/systemctl", "status", "nginx"]);
+```
+
+**Requirement:** the guest OS must have `qemu-guest-agent` installed and
+running (and, on some distros, `guest-exec` enabled in its config). Cloud
+images ship it or install it via cloud-init. A blank disk has no agent to talk
+to. Without a guest agent, use SSH instead (see the `hostForwards` example
+above) — `vm.exec` reports a clear `GuestAgentError` if the agent never
+answers.
+
 ### Controlling a VM over QMP
 
 ```ts

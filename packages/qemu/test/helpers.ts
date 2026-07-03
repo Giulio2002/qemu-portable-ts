@@ -8,7 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { HostPlatform, QemuCommand } from "../src/platform";
+import type { HostPlatform, QemuCommandName } from "../src/platform";
 import { PLATFORM_PACKAGES, executableName } from "../src/platform";
 
 export interface FakePackageTree {
@@ -24,7 +24,7 @@ export interface FakePackageTree {
  */
 export function makeFakePlatformPackage(
   platform: HostPlatform,
-  commands: QemuCommand[],
+  commands: QemuCommandName[],
   options: {
     withDataDir?: boolean;
     withBuildInfo?: boolean;
