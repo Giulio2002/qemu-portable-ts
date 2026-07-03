@@ -1,5 +1,5 @@
 {
-  "name": "@qemu-portable/win32-arm64",
+  "name": "qemu-portable-win32-arm64",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for Windows arm64",
   "os": [

@@ -12,7 +12,7 @@ This is not a pure TypeScript QEMU implementation. It is a TypeScript control
 layer over vendored native QEMU binaries:
 
 ```txt
-Node.js app -> qemu-portable -> @qemu-portable/<platform> -> vendored QEMU binary
+Node.js app -> qemu-portable -> qemu-portable-<platform> -> vendored QEMU binary
 ```
 
 The root package exposes the API and declares platform packages as
@@ -27,14 +27,14 @@ architecture, and (on Linux) libc.
 
 | Host platform | Binary package | Host accelerator |
 |---|---|---|
-| Linux x64 (glibc) | `@qemu-portable/linux-x64` | kvm |
-| Linux arm64 (glibc) | `@qemu-portable/linux-arm64` | kvm |
-| Linux x64 (musl/Alpine) | `@qemu-portable/linux-x64-musl` | kvm |
-| Linux arm64 (musl/Alpine) | `@qemu-portable/linux-arm64-musl` | kvm |
-| macOS arm64 | `@qemu-portable/darwin-arm64` | hvf |
-| macOS x64 | `@qemu-portable/darwin-x64` | hvf |
-| Windows x64 | `@qemu-portable/win32-x64` | whpx |
-| Windows arm64 | `@qemu-portable/win32-arm64` | tcg only (no WHPX upstream) |
+| Linux x64 (glibc) | `qemu-portable-linux-x64` | kvm |
+| Linux arm64 (glibc) | `qemu-portable-linux-arm64` | kvm |
+| Linux x64 (musl/Alpine) | `qemu-portable-linux-x64-musl` | kvm |
+| Linux arm64 (musl/Alpine) | `qemu-portable-linux-arm64-musl` | kvm |
+| macOS arm64 | `qemu-portable-darwin-arm64` | hvf |
+| macOS x64 | `qemu-portable-darwin-x64` | hvf |
+| Windows x64 | `qemu-portable-win32-x64` | whpx |
+| Windows arm64 | `qemu-portable-win32-arm64` | tcg only (no WHPX upstream) |
 
 All eight are built from the same pinned QEMU source in CI, and every build
 must boot a real guest to a serial `BOOT-OK` (TCG) before it can be
@@ -261,7 +261,7 @@ images and CI configs sometimes set these flags globally — check there first.
 
 ## Licensing of the binaries (GPL)
 
-The `qemu-portable` wrapper is MIT. The `@qemu-portable/*` binary packages
+The `qemu-portable` wrapper is MIT. The `qemu-portable-*` binary packages
 redistribute QEMU and are licensed **GPL-2.0-only**; each one ships the full
 GPL text, QEMU license notes, third-party notices for bundled libraries, and
 a written source offer. Complete corresponding source (tarball, patches,
@@ -294,7 +294,7 @@ only — but the security boundary is yours to design.
    `acceleration: "auto"`; QEMU falls back to the next accelerator.
 4. **Firmware not found** — don't pass your own `-L` unless you mean it; the
    library injects the vendored data dir automatically.
-5. **Alpine/musl** — supported via `@qemu-portable/linux-{x64,arm64}-musl`;
+5. **Alpine/musl** — supported via `qemu-portable-linux-{x64,arm64}-musl`;
    npm selects the right flavor automatically from the `libc` field. If you
    see the glibc package on Alpine, your npm is too old to understand `libc`
    (needs npm ≥ 9).

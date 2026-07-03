@@ -1,4 +1,4 @@
-# @qemu-portable/win32-arm64
+# qemu-portable-win32-arm64
 
 Vendored QEMU binaries for Windows arm64. This package is an optional
 dependency of [`qemu-portable`](https://www.npmjs.com/package/qemu-portable) and is

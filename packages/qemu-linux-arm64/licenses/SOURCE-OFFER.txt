@@ -1,7 +1,7 @@
 WRITTEN OFFER FOR SOURCE CODE
 =============================
 
-This npm package (@qemu-portable/linux-arm64) contains binaries of QEMU, licensed under the
+This npm package (qemu-portable-linux-arm64) contains binaries of QEMU, licensed under the
 GNU General Public License version 2 (see GPL-2.0.txt).
 
 Complete corresponding source code — the exact QEMU source archive, all

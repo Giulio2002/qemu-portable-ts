@@ -1,5 +1,5 @@
 {
-  "name": "@qemu-portable/linux-x64",
+  "name": "qemu-portable-linux-x64",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for Linux x64 glibc",
   "os": [

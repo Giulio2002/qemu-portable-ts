@@ -37,7 +37,7 @@ The cadence for tracking upstream stable and security releases is stated in
 | Component | License |
 |---|---|
 | `qemu-portable` (TypeScript wrapper, this repo's tooling) | MIT |
-| `@qemu-portable/*` (binary packages) | GPL-2.0-only |
+| `qemu-portable-*` (binary packages) | GPL-2.0-only |
 
 ## Files included in every binary package
 

@@ -1,4 +1,4 @@
-# @qemu-portable/darwin-x64
+# qemu-portable-darwin-x64
 
 Vendored QEMU binaries for macOS x64. This package is an optional
 dependency of [`qemu-portable`](https://www.npmjs.com/package/qemu-portable) and is

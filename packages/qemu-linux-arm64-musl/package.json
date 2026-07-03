@@ -1,5 +1,5 @@
 {
-  "name": "@qemu-portable/linux-arm64-musl",
+  "name": "qemu-portable-linux-arm64-musl",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for Linux arm64 musl (Alpine)",
   "os": [

@@ -22,6 +22,6 @@ SOFTWARE.
 
 NOTE: This license applies to the TypeScript wrapper code in this repository
 (the "qemu-portable" core package and build tooling). The platform binary
-packages ("@qemu-portable/<platform>") redistribute QEMU, which is licensed under
+packages ("qemu-portable-<platform>") redistribute QEMU, which is licensed under
 GPL-2.0-only. See COMPLIANCE.md and the licenses/ directory inside each
 binary package.

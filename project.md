@@ -26,12 +26,12 @@ qemu-portable
   QMP client
   optionalDependencies -> platform binary packages
 
-@qemu-portable/linux-x64
-@qemu-portable/linux-arm64
-@qemu-portable/linux-x64-musl
-@qemu-portable/darwin-arm64
-@qemu-portable/darwin-x64
-@qemu-portable/win32-x64
+qemu-portable-linux-x64
+qemu-portable-linux-arm64
+qemu-portable-linux-x64-musl
+qemu-portable-darwin-arm64
+qemu-portable-darwin-x64
+qemu-portable-win32-x64
   native QEMU executables
   QEMU firmware/data files
   required dynamic libraries
@@ -65,7 +65,7 @@ resolveBinary("qemu-system-x86_64", { preferSystem: true })
 But the default path is:
 
 ```txt
-Node.js app -> qemu-portable -> @qemu-portable/<platform> -> vendored QEMU binary
+Node.js app -> qemu-portable -> qemu-portable-<platform> -> vendored QEMU binary
 ```
 
 ### 2.3 Do not use install-time downloads in MVP
@@ -99,7 +99,7 @@ Use these terms consistently in code, docs, issues, and package names.
 |---|---|---|
 | Host platform | The machine running Node.js and QEMU | `linux-x64`, `darwin-arm64`, `win32-x64` |
 | Guest target | The architecture QEMU emulates or virtualizes | `x86_64`, `aarch64`, `riscv64` |
-| Binary package | Platform-specific npm package containing native QEMU files | `@qemu-portable/linux-x64` |
+| Binary package | Platform-specific npm package containing native QEMU files | `qemu-portable-linux-x64` |
 | Core package | TypeScript wrapper package | `qemu-portable` |
 | Accelerator | QEMU execution backend | `kvm`, `hvf`, `whpx`, `tcg` |
 | TCG | QEMU software emulation fallback | works broadly, slower |
@@ -109,7 +109,7 @@ Important distinction:
 
 ```txt
 Host package:
-  @qemu-portable/linux-x64
+  qemu-portable-linux-x64
 
 Guest binaries inside that host package:
   qemu-system-x86_64
@@ -337,11 +337,11 @@ Use `pnpm` or npm workspaces. The examples below use generic package names and d
     "node": ">=20"
   },
   "optionalDependencies": {
-    "@qemu-portable/linux-x64": "0.1.0",
-    "@qemu-portable/linux-arm64": "0.1.0",
-    "@qemu-portable/darwin-arm64": "0.1.0",
-    "@qemu-portable/darwin-x64": "0.1.0",
-    "@qemu-portable/win32-x64": "0.1.0"
+    "qemu-portable-linux-x64": "0.1.0",
+    "qemu-portable-linux-arm64": "0.1.0",
+    "qemu-portable-darwin-arm64": "0.1.0",
+    "qemu-portable-darwin-x64": "0.1.0",
+    "qemu-portable-win32-x64": "0.1.0"
   },
   "license": "MIT"
 }
@@ -355,7 +355,7 @@ The wrapper can be MIT/Apache/ISC/etc. The shipped QEMU binary packages must car
 
 ```json
 {
-  "name": "@qemu-portable/linux-x64",
+  "name": "qemu-portable-linux-x64",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for Linux x64 glibc",
   "os": ["linux"],
@@ -377,7 +377,7 @@ For Alpine/musl packages later:
 
 ```json
 {
-  "name": "@qemu-portable/linux-x64-musl",
+  "name": "qemu-portable-linux-x64-musl",
   "version": "0.2.0",
   "os": ["linux"],
   "cpu": ["x64"],
@@ -393,7 +393,7 @@ For Alpine/musl packages later:
 
 ```json
 {
-  "name": "@qemu-portable/darwin-arm64",
+  "name": "qemu-portable-darwin-arm64",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for macOS arm64",
   "os": ["darwin"],
@@ -416,7 +416,7 @@ For Alpine/musl packages later:
 
 ```json
 {
-  "name": "@qemu-portable/win32-x64",
+  "name": "qemu-portable-win32-x64",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for Windows x64",
   "os": ["win32"],
@@ -542,7 +542,7 @@ Example error:
 No vendored QEMU binary package found for linux-x64-glibc.
 
 Expected optional dependency:
-  @qemu-portable/linux-x64
+  qemu-portable-linux-x64
 
 This usually means optional dependencies were skipped, for example:
   npm install --omit=optional
@@ -922,13 +922,13 @@ QMP must bind locally only. Do not expose QMP over public TCP in any helper.
 
 ```ts
 const PLATFORM_PACKAGES: Record<string, string> = {
-  "linux-x64-glibc": "@qemu-portable/linux-x64",
-  "linux-arm64-glibc": "@qemu-portable/linux-arm64",
-  "linux-x64-musl": "@qemu-portable/linux-x64-musl",
-  "linux-arm64-musl": "@qemu-portable/linux-arm64-musl",
-  "darwin-arm64": "@qemu-portable/darwin-arm64",
-  "darwin-x64": "@qemu-portable/darwin-x64",
-  "win32-x64": "@qemu-portable/win32-x64"
+  "linux-x64-glibc": "qemu-portable-linux-x64",
+  "linux-arm64-glibc": "qemu-portable-linux-arm64",
+  "linux-x64-musl": "qemu-portable-linux-x64-musl",
+  "linux-arm64-musl": "qemu-portable-linux-arm64-musl",
+  "darwin-arm64": "qemu-portable-darwin-arm64",
+  "darwin-x64": "qemu-portable-darwin-x64",
+  "win32-x64": "qemu-portable-win32-x64"
 };
 ```
 
@@ -1093,8 +1093,8 @@ All packages should publish with the same npm version:
 
 ```txt
 qemu-portable@0.1.0
-@qemu-portable/linux-x64@0.1.0
-@qemu-portable/linux-arm64@0.1.0
+qemu-portable-linux-x64@0.1.0
+qemu-portable-linux-arm64@0.1.0
 ...
 ```
 
@@ -1417,11 +1417,11 @@ Adjust runner names based on available CI provider support.
 Publish binary packages first:
 
 ```txt
-@qemu-portable/linux-x64
-@qemu-portable/linux-arm64
-@qemu-portable/darwin-arm64
-@qemu-portable/darwin-x64
-@qemu-portable/win32-x64
+qemu-portable-linux-x64
+qemu-portable-linux-arm64
+qemu-portable-darwin-arm64
+qemu-portable-darwin-x64
+qemu-portable-win32-x64
 ```
 
 Then publish core:

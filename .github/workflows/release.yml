@@ -79,7 +79,8 @@ jobs:
           set -e
           for dir in $(node -e "
             const deps = require('$GITHUB_WORKSPACE/packages/qemu/package.json').optionalDependencies;
-            for (const name of Object.keys(deps)) console.log('qemu-' + name.split('/')[1]);
+            // npm name qemu-portable-<platform> -> workspace dir qemu-<platform>
+            for (const name of Object.keys(deps)) console.log(name.replace('qemu-portable-', 'qemu-'));
           "); do
             npm publish "packages/$dir" --provenance --access public
           done
@@ -115,6 +116,6 @@ jobs:
 
             The attached source archive, patches, and build scripts are the
             complete corresponding source for the GPL-licensed binaries in the
-            @qemu-portable/* packages of this release.
+            qemu-portable-* packages of this release.
           files: |
             /tmp/source-release/*

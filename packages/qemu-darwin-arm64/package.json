@@ -1,5 +1,5 @@
 {
-  "name": "@qemu-portable/darwin-arm64",
+  "name": "qemu-portable-darwin-arm64",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for macOS arm64",
   "os": [

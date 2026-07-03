@@ -64,14 +64,14 @@ export function isKnownQemuCommand(value: unknown): value is QemuCommand {
 
 /** Maps a host platform to the npm package that vendors its binaries. */
 export const PLATFORM_PACKAGES: Record<HostPlatform, string> = {
-  "linux-x64": "@qemu-portable/linux-x64",
-  "linux-arm64": "@qemu-portable/linux-arm64",
-  "linux-x64-musl": "@qemu-portable/linux-x64-musl",
-  "linux-arm64-musl": "@qemu-portable/linux-arm64-musl",
-  "darwin-arm64": "@qemu-portable/darwin-arm64",
-  "darwin-x64": "@qemu-portable/darwin-x64",
-  "win32-x64": "@qemu-portable/win32-x64",
-  "win32-arm64": "@qemu-portable/win32-arm64",
+  "linux-x64": "qemu-portable-linux-x64",
+  "linux-arm64": "qemu-portable-linux-arm64",
+  "linux-x64-musl": "qemu-portable-linux-x64-musl",
+  "linux-arm64-musl": "qemu-portable-linux-arm64-musl",
+  "darwin-arm64": "qemu-portable-darwin-arm64",
+  "darwin-x64": "qemu-portable-darwin-x64",
+  "win32-x64": "qemu-portable-win32-x64",
+  "win32-arm64": "qemu-portable-win32-arm64",
 };
 
 export const SUPPORTED_PLATFORMS = Object.keys(

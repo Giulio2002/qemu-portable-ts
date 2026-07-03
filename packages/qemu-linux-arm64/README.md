@@ -1,4 +1,4 @@
-# @qemu-portable/linux-arm64
+# qemu-portable-linux-arm64
 
 Vendored QEMU binaries for Linux arm64 glibc. This package is an optional
 dependency of [`qemu-portable`](https://www.npmjs.com/package/qemu-portable) and is

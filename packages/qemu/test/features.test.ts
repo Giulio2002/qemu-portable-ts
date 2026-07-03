@@ -55,7 +55,7 @@ test("checkHostSupport reports ok for an installed package", () => {
   });
   assert.equal(report.ok, true);
   assert.equal(report.platform, "linux-x64");
-  assert.equal(report.packageName, "@qemu-portable/linux-x64");
+  assert.equal(report.packageName, "qemu-portable-linux-x64");
   assert.deepEqual(report.availableCommands, ["qemu-img"]);
 });
 

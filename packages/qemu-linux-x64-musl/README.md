@@ -1,4 +1,4 @@
-# @qemu-portable/linux-x64-musl
+# qemu-portable-linux-x64-musl
 
 Vendored QEMU binaries for Linux x64 musl (Alpine). This package is an optional
 dependency of [`qemu-portable`](https://www.npmjs.com/package/qemu-portable) and is

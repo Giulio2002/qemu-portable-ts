@@ -32,14 +32,14 @@
     "test": "node run-tests.js"
   },
   "optionalDependencies": {
-    "@qemu-portable/linux-x64": "0.1.0",
-    "@qemu-portable/linux-arm64": "0.1.0",
-    "@qemu-portable/linux-x64-musl": "0.1.0",
-    "@qemu-portable/linux-arm64-musl": "0.1.0",
-    "@qemu-portable/darwin-arm64": "0.1.0",
-    "@qemu-portable/darwin-x64": "0.1.0",
-    "@qemu-portable/win32-x64": "0.1.0",
-    "@qemu-portable/win32-arm64": "0.1.0"
+    "qemu-portable-linux-x64": "0.1.0",
+    "qemu-portable-linux-arm64": "0.1.0",
+    "qemu-portable-linux-x64-musl": "0.1.0",
+    "qemu-portable-linux-arm64-musl": "0.1.0",
+    "qemu-portable-darwin-arm64": "0.1.0",
+    "qemu-portable-darwin-x64": "0.1.0",
+    "qemu-portable-win32-x64": "0.1.0",
+    "qemu-portable-win32-arm64": "0.1.0"
   },
   "license": "MIT"
 }

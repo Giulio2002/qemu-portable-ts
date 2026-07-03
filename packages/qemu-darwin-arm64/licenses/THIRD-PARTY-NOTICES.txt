@@ -1,7 +1,7 @@
 THIRD-PARTY NOTICES
 ===================
 
-This package (@qemu-portable/darwin-arm64) redistributes QEMU (GPL-2.0-only; see
+This package (qemu-portable-darwin-arm64) redistributes QEMU (GPL-2.0-only; see
 GPL-2.0.txt and QEMU-LICENSE.txt) together with the following dynamic
 libraries collected at build time:
 

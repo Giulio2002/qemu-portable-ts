@@ -132,13 +132,12 @@ if (info.status !== 0) process.exit(info.status ?? 1);
 // A plain symlink instead of `npm install ./packages/...`: npm's arborist
 // cannot reconcile a file: install with the same name as an unresolvable
 // optionalDependency of a workspace package.
-const npmName = platformPackage.replace(/^qemu-/, "");
-const scopeDir = join(repoRoot, "node_modules", "@qemu-portable");
-mkdirSync(scopeDir, { recursive: true });
-const linkPath = join(scopeDir, npmName);
+const npmName = platformPackage.replace(/^qemu-/, "qemu-portable-");
+const linkPath = join(repoRoot, "node_modules", npmName);
+mkdirSync(dirname(linkPath), { recursive: true });
 rmSync(linkPath, { recursive: true, force: true });
 symlinkSync(packageDir, linkPath, "dir");
-console.log(`linked node_modules/@qemu-portable/${npmName} -> packages/${platformPackage}`);
+console.log(`linked node_modules/${npmName} -> packages/${platformPackage}`);
 
 console.log(`\nPopulated packages/${platformPackage} from the local QEMU ${qemuVersion}.`);
 console.log("Next: npm run smoke");

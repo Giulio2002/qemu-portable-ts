@@ -42,7 +42,7 @@ test("resolveQemuBinary finds a vendored binary via platform override", () => {
   });
   assert.equal(resolved.command, "qemu-img");
   assert.equal(resolved.path, join(fake.packageRoot, "bin", "qemu-img"));
-  assert.equal(resolved.packageName, "@qemu-portable/linux-x64");
+  assert.equal(resolved.packageName, "qemu-portable-linux-x64");
   assert.equal(resolved.hostPlatform, "linux-x64");
   assert.equal(resolved.qemuDataDir, join(fake.packageRoot, "share", "qemu"));
   assert.equal(resolved.version, "10.0.2");
@@ -68,7 +68,7 @@ test("resolveQemuBinary throws a clear error when the platform package is missin
     (err: Error) => {
       assert.ok(err instanceof QemuBinaryNotFoundError);
       assert.equal(err.code, "ERR_QEMU_BINARY_NOT_FOUND");
-      assert.match(err.message, /@qemu-portable\/linux-arm64/);
+      assert.match(err.message, /qemu-portable-linux-arm64/);
       assert.match(err.message, /--omit=optional/);
       assert.match(err.message, /--no-optional/);
       return true;
@@ -173,7 +173,7 @@ test("preferSystem falls back to vendored binary when PATH has no match", () => 
     preferSystem: true,
     env: { PATH: "/nonexistent-bin-dir" },
   });
-  assert.equal(resolved.packageName, "@qemu-portable/linux-x64");
+  assert.equal(resolved.packageName, "qemu-portable-linux-x64");
 });
 
 test("preferSystem uses PATH binary when present", () => {

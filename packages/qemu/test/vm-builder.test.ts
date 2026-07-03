@@ -10,7 +10,7 @@ function fakeResolved(command: QemuSystemCommand): ResolvedQemuBinary {
   return {
     command,
     path: `/fake/bin/${command}`,
-    packageName: "@qemu-portable/test",
+    packageName: "qemu-portable-test",
     packageRoot: "/fake",
     hostPlatform: "linux-x64",
     qemuDataDir: "/fake/share/qemu",
