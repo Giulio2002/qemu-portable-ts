@@ -18,18 +18,24 @@ jobs:
             package: qemu-linux-arm64
             host: linux-arm64-glibc
             script: scripts/build-qemu-linux.sh
-          # musl builds run inside an Alpine container so the toolchain,
-          # ldd output, and smoke tests are all genuinely musl.
+          # musl builds run inside an Alpine container driven via docker run
+          # (not `container:` — JavaScript actions don't work in Alpine
+          # containers on arm64 runners), so the toolchain, ldd output, and
+          # smoke tests are all genuinely musl while checkout/upload stay on
+          # the glibc host.
+          # node:22-alpine, not plain alpine: Alpine's distro nodejs is built
+          # without TypeScript strip-types support (ERR_NO_TYPESCRIPT); the
+          # official Node image on the same musl base has it.
           - os: ubuntu-24.04
             package: qemu-linux-x64-musl
             host: linux-x64-musl
-            script: scripts/build-qemu-linux.sh
-            container: alpine:3.21
+            script: scripts/ci-alpine-musl.sh
+            musl_image: node:22-alpine
           - os: ubuntu-24.04-arm
             package: qemu-linux-arm64-musl
             host: linux-arm64-musl
-            script: scripts/build-qemu-linux.sh
-            container: alpine:3.21
+            script: scripts/ci-alpine-musl.sh
+            musl_image: node:22-alpine
           - os: macos-15
             package: qemu-darwin-arm64
             host: darwin-arm64
@@ -51,28 +57,15 @@ jobs:
             msystem: CLANGARM64
             mingw_prefix: mingw-w64-clang-aarch64
     runs-on: ${{ matrix.os }}
-    # Empty for non-musl entries → runs directly on the runner.
-    container: ${{ matrix.container }}
     steps:
-      # Alpine container: everything (node included) comes from apk; the
-      # runner-provided node is glibc-linked and must not be used.
-      - name: Install build dependencies (Alpine/musl)
-        if: matrix.container != ''
-        run: |
-          apk add --no-cache \
-            bash curl git tar xz coreutils build-base linux-headers \
-            ninja meson pkgconf python3 py3-setuptools py3-pip \
-            glib-dev pixman-dev libslirp-dev patchelf \
-            nodejs npm
-
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        if: matrix.container == ''
+        if: matrix.musl_image == ''
         with:
           node-version: 22
 
       - name: Install build dependencies (Linux glibc)
-        if: runner.os == 'Linux' && matrix.container == ''
+        if: runner.os == 'Linux' && matrix.musl_image == ''
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -85,12 +78,16 @@ jobs:
 
       - name: Install build dependencies (Windows / MSYS2)
         if: runner.os == 'Windows'
+        id: msys2
         uses: msys2/setup-msys2@v2
         with:
           # MINGW64 for x64; CLANGARM64 for Windows on ARM (there is no
           # native mingw-w64 GCC for aarch64, so the clang toolchain is used).
+          # No `location:` — the action's own default is used and the real
+          # root comes from its msys2-location output. x64 runner images ship
+          # an unrelated preinstalled MSYS2 at C:\msys64, so hardcoding paths
+          # silently picks up the wrong (toolchain-less) installation.
           msystem: ${{ matrix.msystem }}
-          location: C:\msys64
           install: >-
             base-devel git python
             ${{ matrix.mingw_prefix }}-toolchain ${{ matrix.mingw_prefix }}-ninja
@@ -99,32 +96,44 @@ jobs:
             ${{ matrix.mingw_prefix }}-libslirp
 
       - name: Build QEMU and assemble package (Unix)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && matrix.musl_image == ''
         run: ${{ matrix.script }} packages/${{ matrix.package }}
+
+      # The Alpine script runs the entire pipeline — build, compliance gate,
+      # smoke test, boot test — inside the container in one pass.
+      - name: Build, verify and smoke test (Alpine/musl container)
+        if: matrix.musl_image != ''
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/workspace" -w /workspace \
+            ${{ matrix.musl_image }} sh ${{ matrix.script }} packages/${{ matrix.package }}
 
       - name: Build QEMU and assemble package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         env:
           # Consumed by build-qemu-windows.ps1 / collect-runtime-deps.ts so the
-          # right MSYS2 environment and DLL directory are used per architecture.
+          # right MSYS2 installation, environment, and DLL directory are used.
           QEMU_MSYS_ENV: ${{ matrix.msystem }}
-          QEMU_DLL_SEARCH_PATH: C:\msys64\${{ matrix.msystem == 'CLANGARM64' && 'clangarm64' || 'mingw64' }}\bin
+          QEMU_MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
+          QEMU_DLL_SEARCH_PATH: ${{ steps.msys2.outputs.msys2-location }}\${{ matrix.msystem == 'CLANGARM64' && 'clangarm64' || 'mingw64' }}\bin
         run: ${{ matrix.script }} -PackageDir packages/${{ matrix.package }}
 
       - name: Compliance gate
+        if: matrix.musl_image == ''
         run: node --experimental-strip-types scripts/verify-license-files.ts packages/${{ matrix.package }}
 
       - name: Smoke test on the build host
+        if: matrix.musl_image == ''
         run: |
           npm ci
           npm run build
-          npm install --no-save ./packages/${{ matrix.package }}
+          node --experimental-strip-types scripts/link-platform-package.ts packages/${{ matrix.package }}
           node --experimental-strip-types scripts/smoke-test.ts
 
       # Boot a real guest (self-generated payloads, TCG) to serial "BOOT-OK".
       # This is what proves a published binary actually runs a guest.
       - name: Boot smoke test on the build host
+        if: matrix.musl_image == ''
         run: node --experimental-strip-types scripts/boot-test.ts
 
       - name: Upload package artifact

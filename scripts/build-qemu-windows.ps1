@@ -45,14 +45,28 @@ if (-not (Test-Path "qemu-$QemuVersion")) {
 # MSYS2 environment is selected per architecture: MINGW64 for x64,
 # CLANGARM64 for Windows on ARM.
 $MsysEnv = if ($env:QEMU_MSYS_ENV) { $env:QEMU_MSYS_ENV } else { "MINGW64" }
+# Root of the MSYS2 installation actually provisioned by setup-msys2 (its
+# msys2-location output). Never hardcode C:\msys64: x64 runner images ship an
+# unrelated preinstalled MSYS2 there (without our toolchain), and arm64
+# runners have nothing there at all.
+$Msys2Root = if ($env:QEMU_MSYS2_ROOT) { $env:QEMU_MSYS2_ROOT } else { "C:\msys64" }
+$Msys2Bash = Join-Path $Msys2Root "usr\bin\bash.exe"
+if (-not (Test-Path $Msys2Bash)) {
+    throw "bash.exe not found at $Msys2Bash — set QEMU_MSYS2_ROOT to the MSYS2 root (setup-msys2's msys2-location output)"
+}
 $ConfigureArgs = "--target-list=$TargetList --disable-docs --disable-werror --disable-gtk --disable-sdl --enable-slirp"
 if ($MsysEnv -ne "CLANGARM64") {
     # QEMU's WHPX accelerator only exists for x86 hosts; win32-arm64 is
     # TCG-only until upstream grows aarch64 WHPX support.
     $ConfigureArgs += " --enable-whpx"
 }
+# MSYS2's MinGW toolchains ship no `cc` shim, and QEMU's configure defaults
+# to CC=cc — point it at the environment's real compiler explicitly.
+$CcName = if ($MsysEnv -eq "CLANGARM64") { "clang" } else { "gcc" }
+$CxxName = if ($MsysEnv -eq "CLANGARM64") { "clang++" } else { "g++" }
 $BuildScript = @"
 set -e
+export CC=$CcName CXX=$CxxName
 cd '$($WorkDir -replace '\\','/')/qemu-$QemuVersion'
 # Apply repo patches, if any.
 for p in '$($RepoRoot -replace '\\','/')'/third_party/qemu/patches/*.patch; do
@@ -64,7 +78,8 @@ make -j`$(nproc)
 "@
 # MSYSTEM tells the MSYS2 login shell which toolchain environment to load.
 $env:MSYSTEM = $MsysEnv
-& C:\msys64\usr\bin\bash.exe -lc $BuildScript
+& $Msys2Bash -lc $BuildScript
+if ($LASTEXITCODE -ne 0) { throw "QEMU build failed (exit $LASTEXITCODE)" }
 
 # --- Assemble the package -------------------------------------------------------
 $BuildDir = Join-Path $WorkDir "qemu-$QemuVersion/build"
@@ -79,7 +94,10 @@ foreach ($bin in $Binaries) {
 Copy-Item -Recurse (Join-Path $BuildDir "pc-bios/*") $ShareDir
 node --experimental-strip-types (Join-Path $RepoRoot "scripts/prune-firmware.ts") $PackageDir
 
-# DLLs live next to the executables on Windows.
+# DLLs live next to the executables on Windows. collect-runtime-deps needs
+# objdump (MINGW64) or llvm-objdump (CLANGARM64) on PATH to read PE imports.
+$DllDir = if ($env:QEMU_DLL_SEARCH_PATH) { $env:QEMU_DLL_SEARCH_PATH } else { Join-Path $Msys2Root "mingw64\bin" }
+$env:PATH = "$DllDir;$(Join-Path $Msys2Root 'usr\bin');$env:PATH"
 node --experimental-strip-types (Join-Path $RepoRoot "scripts/collect-runtime-deps.ts") $PackageDir
 
 # --- Metadata --------------------------------------------------------------------

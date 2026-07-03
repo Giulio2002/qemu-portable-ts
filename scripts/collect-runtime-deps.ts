@@ -28,8 +28,9 @@ if (!packageDir || !existsSync(join(packageDir, "package.json"))) {
 // System libraries that must NOT be bundled: they belong to the OS and are
 // either non-redistributable or guaranteed present.
 const LINUX_SYSTEM_PREFIXES = [
-  "linux-vdso", "ld-linux", "ld-musl", "libc.so", "libm.so", "libdl.so",
-  "librt.so", "libpthread.so", "libresolv.so", "libgcc_s.so", "libstdc++.so",
+  "linux-vdso", "ld-linux", "ld-musl", "libc.so", "libc.musl", "libm.so",
+  "libdl.so", "librt.so", "libpthread.so", "libresolv.so", "libgcc_s.so",
+  "libstdc++.so",
 ];
 const DARWIN_SYSTEM_PREFIXES = ["/usr/lib/", "/System/Library/"];
 const WINDOWS_SYSTEM_DLLS = new Set([
@@ -75,11 +76,25 @@ const LICENSE_HINTS: Record<string, string> = {
   hogweed: "LGPL-3.0-or-later OR GPL-2.0-or-later",
   idn2: "LGPL-3.0-or-later OR GPL-2.0-or-later",
   ncurses: "MIT-open-group",
+  tinfo: "MIT-open-group", // terminfo, part of ncurses
+  blkid: "LGPL-2.1-or-later", // util-linux
+  mount: "LGPL-2.1-or-later", // util-linux (glib pulls libmount)
+  selinux: "Public-Domain", // libselinux carries a public-domain notice
   "p11-kit": "BSD-3-Clause",
   tasn1: "LGPL-2.1-or-later",
   unistring: "LGPL-3.0-or-later OR GPL-2.0-or-later",
   usb: "LGPL-2.1-or-later",
   vdeplug: "LGPL-2.1-or-later",
+  bz2: "bzip2-1.0.6",
+  expat: "MIT",
+  econf: "MIT", // libeconf (musl/Alpine glib dependency)
+  // MinGW/LLVM runtime DLLs bundled on Windows (system libs on Linux, where
+  // LINUX_SYSTEM_PREFIXES excludes them before this table is consulted).
+  winpthread: "MIT AND BSD-3-Clause",
+  gcc_s: "GPL-3.0-or-later WITH GCC-exception-3.1",
+  "stdc++": "GPL-3.0-or-later WITH GCC-exception-3.1",
+  "c++": "Apache-2.0 WITH LLVM-exception",
+  unwind: "Apache-2.0 WITH LLVM-exception",
 };
 
 /** Copy a library, replacing any prior (possibly read-only) copy. */
@@ -179,10 +194,25 @@ function collectWindows(): CollectedDep[] {
     .split(";")
     .filter(Boolean);
 
+  // GNU objdump (MINGW64) cannot read arm64 PE files; CLANGARM64 ships
+  // llvm-objdump instead. Both print "DLL Name:" lines under -p.
+  function peImports(target: string): string {
+    const tools = ["objdump", "llvm-objdump"];
+    let lastError: unknown;
+    for (const tool of tools) {
+      try {
+        return execFileSync(tool, ["-p", target], { encoding: "utf8" });
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError;
+  }
+
   const queue = listBinaries(binDir);
   while (queue.length > 0) {
     const target = queue.pop() as string;
-    const output = execFileSync("objdump", ["-p", target], { encoding: "utf8" });
+    const output = peImports(target);
     for (const line of output.split("\n")) {
       const match = line.match(/DLL Name:\s*(\S+)/);
       if (!match) continue;
