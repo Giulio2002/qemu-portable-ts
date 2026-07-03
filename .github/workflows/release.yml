@@ -91,13 +91,15 @@ jobs:
             // npm name qemu-portable-<platform> -> workspace dir qemu-<platform>
             for (const name of Object.keys(deps)) console.log(name.replace('qemu-portable-', 'qemu-'));
           "); do
-            npm publish "packages/$dir" --provenance --access public
+            # Leading ./ is required: a bare "packages/<dir>" is parsed by
+            # npm as a GitHub owner/repo spec, not a local path.
+            npm publish "./packages/$dir" --provenance --access public
           done
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish core package
-        run: npm publish packages/qemu --provenance --access public
+        run: npm publish ./packages/qemu --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
