@@ -30,6 +30,15 @@ jobs:
       # download-artifact restores each artifact into packages/<name>/,
       # matching the workspace layout exactly.
 
+      # Artifact transport (zip) strips POSIX file modes; npm pack records
+      # on-disk modes, so without this the published binaries would not be
+      # executable. verify-binary-package.ts gates on exactly this.
+      - name: Restore executable permissions lost by artifact transport
+        run: |
+          for dir in packages/qemu-*/bin packages/qemu-*/lib; do
+            [ -d "$dir" ] && chmod 755 "$dir"/* 2>/dev/null || true
+          done
+
       - name: Build core package
         run: |
           npm ci
