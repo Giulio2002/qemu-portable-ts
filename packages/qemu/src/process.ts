@@ -22,6 +22,14 @@ export interface QemuRunOptions {
   resolved?: ResolvedQemuBinary;
   /** Do not auto-inject `-L <share/qemu>` for system emulators. */
   noDataDir?: boolean;
+  /**
+   * Kill this QEMU process when the Node.js process exits (normal exit,
+   * process.exit(), SIGINT/SIGTERM/SIGHUP/SIGBREAK), so VMs are never
+   * orphaned. Default true. Set false for daemon-style VMs that must
+   * outlive the launching process. This is a hard kill — graceful guest
+   * shutdown (QMP system_powerdown, vm.stop()) is the caller's job.
+   */
+  killOnExit?: boolean;
 }
 
 export interface QemuExitResult {
@@ -95,6 +103,65 @@ export function buildLibraryEnv(
     env[name] = env[name] ? `${value}${delimiter}${env[name]}` : value;
   }
   return env;
+}
+
+// --- orphan protection ---------------------------------------------------------
+// Node.js does not kill child processes when the parent exits; without this,
+// an app that crashes or calls process.exit() leaves QEMU VMs running.
+
+/** QEMU children to kill when this process goes down (killOnExit !== false). */
+const liveChildren = new Set<ChildProcess>();
+let exitHooksInstalled = false;
+
+/** Synchronously kill every registered QEMU child (used from exit hooks). */
+export function killAllQemuProcesses(signal: NodeJS.Signals = "SIGKILL"): void {
+  for (const child of liveChildren) {
+    try {
+      child.kill(signal);
+    } catch {
+      // already gone
+    }
+  }
+}
+
+/** Number of registered live QEMU children (diagnostics/tests). */
+export function countLiveQemuProcesses(): number {
+  return liveChildren.size;
+}
+
+function installExitHooks(): void {
+  if (exitHooksInstalled) return;
+  exitHooksInstalled = true;
+
+  // 'exit' fires on normal exit and process.exit(); only sync work runs here.
+  process.once("exit", () => killAllQemuProcesses("SIGKILL"));
+
+  // Fatal signals do not fire 'exit' unless something turns them into an
+  // exit. Kill the children, then get out of the way: if this handler is the
+  // only listener, re-raise the signal with default disposition so the
+  // process still dies with the conventional exit code. If the app has its
+  // own handler, it stays in charge of if/when to exit.
+  const signals: NodeJS.Signals[] =
+    process.platform === "win32"
+      ? ["SIGINT", "SIGTERM", "SIGBREAK"]
+      : ["SIGINT", "SIGTERM", "SIGHUP"];
+  for (const signal of signals) {
+    const handler = (): void => {
+      killAllQemuProcesses("SIGTERM");
+      if (process.listenerCount(signal) === 1) {
+        process.removeListener(signal, handler);
+        process.kill(process.pid, signal);
+      }
+    };
+    process.on(signal, handler);
+  }
+}
+
+function registerForCleanup(child: ChildProcess): void {
+  installExitHooks();
+  liveChildren.add(child);
+  child.once("close", () => liveChildren.delete(child));
+  child.once("error", () => liveChildren.delete(child));
 }
 
 function wrapChildProcess(
@@ -202,6 +269,10 @@ export function spawnQemu(
     signal: options.signal,
     windowsHide: options.windowsHide ?? true,
   });
+
+  if (options.killOnExit !== false) {
+    registerForCleanup(child);
+  }
 
   return wrapChildProcess(
     child,

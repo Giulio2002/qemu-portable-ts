@@ -221,6 +221,19 @@ for (const { name, value } of resolveRuntimeEnv(bin)) {
 spawn(bin.path, ["-L", bin.firmwareDir!, "-machine", "q35", /* ... */], { env });
 ```
 
+### Process lifecycle
+
+QEMU processes started through this library are killed when your Node.js
+process exits — normal exit, `process.exit()`, or a fatal signal
+(SIGINT/SIGTERM/SIGHUP, SIGBREAK on Windows) — so crashed or Ctrl-C'd apps
+never leave orphaned VMs behind. This is a hard kill: for a clean guest
+shutdown, stop the VM yourself first (`vm.stop()`, QMP `system_powerdown`).
+For a VM that must outlive the launching process, opt out per spawn:
+
+```ts
+spawnQemu("qemu-system-x86_64", args, { killOnExit: false });
+```
+
 ## How vendored binaries work
 
 Each platform package contains `bin/` (QEMU executables), `lib/` (bundled
