@@ -77,6 +77,7 @@ for bin in "${BINARIES[@]}"; do
   strip --strip-unneeded "$PACKAGE_DIR/bin/$bin" || true
 done
 cp -R "$DESTDIR/usr/share/qemu" "$PACKAGE_DIR/share/qemu"
+node --experimental-strip-types "$REPO_ROOT/scripts/prune-firmware.ts" "$PACKAGE_DIR"
 
 # --- Bundle runtime deps and fix RPATH -----------------------------------------
 node --experimental-strip-types "$REPO_ROOT/scripts/collect-runtime-deps.ts" "$PACKAGE_DIR"

@@ -1,9 +1,9 @@
 {
-  "name": "qemu-ts-monorepo",
+  "name": "qemu-portable-monorepo",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Monorepo for @org/qemu — TypeScript API over vendored QEMU binaries",
+  "description": "Monorepo for qemu-portable — TypeScript API over vendored QEMU binaries",
   "workspaces": [
     "packages/qemu"
   ],
@@ -11,12 +11,13 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "npm run build --workspace @org/qemu",
-    "typecheck": "npm run typecheck --workspace @org/qemu",
-    "test": "npm run test --workspace @org/qemu",
+    "build": "npm run build --workspace qemu-portable",
+    "typecheck": "npm run typecheck --workspace qemu-portable",
+    "test": "npm run test --workspace qemu-portable",
     "verify:packages": "node --experimental-strip-types scripts/verify-binary-package.ts",
     "verify:licenses": "node --experimental-strip-types scripts/verify-license-files.ts",
-    "smoke": "node --experimental-strip-types scripts/smoke-test.ts"
+    "smoke": "node --experimental-strip-types scripts/smoke-test.ts",
+    "smoke:boot": "node --experimental-strip-types scripts/boot-test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

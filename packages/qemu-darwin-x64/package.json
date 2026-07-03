@@ -1,5 +1,5 @@
 {
-  "name": "@org/qemu-darwin-x64",
+  "name": "@qemu-portable/darwin-x64",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for macOS x64",
   "os": [
@@ -18,7 +18,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/org/qemu-ts.git"
+    "url": "https://github.com/Giulio2002/qemu-portable-ts.git"
   },
   "license": "GPL-2.0-only"
 }

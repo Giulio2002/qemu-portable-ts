@@ -6,6 +6,7 @@ import {
   PLATFORM_PACKAGES,
   getHostPlatform,
 } from "./platform";
+import { QemuFeatureFlags, getQemuFeatures } from "./features";
 import {
   ResolvedQemuBinary,
   listAvailableBinaries,
@@ -25,6 +26,8 @@ export interface QemuDiagnostics {
   missingBinaryPackages: string[];
   binaries: ResolvedQemuBinary[];
   acceleratorHints: AcceleratorHint[];
+  /** Build feature flags of the installed platform package, if any. */
+  features?: QemuFeatureFlags;
 }
 
 /**
@@ -106,6 +109,14 @@ export async function getQemuDiagnostics(options: {
     searchPaths: options.searchPaths,
   });
 
+  let features: QemuFeatureFlags | undefined;
+  if (binaries.length > 0) {
+    features = getQemuFeatures({
+      platform: hostPlatform,
+      searchPaths: options.searchPaths,
+    });
+  }
+
   return {
     hostPlatform,
     nodeVersion: process.version,
@@ -113,6 +124,7 @@ export async function getQemuDiagnostics(options: {
     missingBinaryPackages,
     binaries,
     acceleratorHints: getAcceleratorHints(),
+    features,
   };
 }
 
@@ -139,6 +151,13 @@ export function formatDiagnostics(diag: QemuDiagnostics): string {
     lines.push(`    package:  ${bin.packageName}`);
     if (bin.version) lines.push(`    version:  ${bin.version}`);
     if (bin.qemuDataDir) lines.push(`    data dir: ${bin.qemuDataDir}`);
+  }
+  if (diag.features) {
+    lines.push("");
+    lines.push(`Build features (${diag.features.source}):`);
+    lines.push(`  guest targets: ${diag.features.guestTargets.join(", ") || "(none)"}`);
+    lines.push(`  accelerators:  ${diag.features.accelerators.join(", ")}`);
+    lines.push(`  slirp:         ${diag.features.networking.slirp}`);
   }
   lines.push("");
   lines.push("Accelerator hints:");

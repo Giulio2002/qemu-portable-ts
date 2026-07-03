@@ -28,6 +28,8 @@ export function makeFakePlatformPackage(
   options: {
     withDataDir?: boolean;
     withBuildInfo?: boolean;
+    /** Extra fields merged into build-info.json (e.g. features). */
+    buildInfoExtra?: Record<string, unknown>;
     /** Shell script body for each fake binary (POSIX platforms). */
     script?: string;
   } = {}
@@ -70,6 +72,7 @@ export function makeFakePlatformPackage(
         targets: commands,
         configureArgs: ["--target-list=x86_64-softmmu,aarch64-softmmu"],
         runtimeDependencies: [],
+        ...options.buildInfoExtra,
       })
     );
   }

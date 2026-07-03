@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 @org/qemu contributors
+Copyright (c) 2026 qemu-portable contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 NOTE: This license applies to the TypeScript wrapper code in this repository
-(the "@org/qemu" core package and build tooling). The platform binary
-packages ("@org/qemu-<platform>") redistribute QEMU, which is licensed under
+(the "qemu-portable" core package and build tooling). The platform binary
+packages ("@qemu-portable/<platform>") redistribute QEMU, which is licensed under
 GPL-2.0-only. See COMPLIANCE.md and the licenses/ directory inside each
 binary package.

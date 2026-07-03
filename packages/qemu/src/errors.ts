@@ -1,6 +1,6 @@
 import type { QemuExitResult } from "./process";
 
-/** Base class for every error thrown by @org/qemu. */
+/** Base class for every error thrown by qemu-portable. */
 export abstract class QemuError extends Error {
   abstract readonly code: string;
   constructor(message: string) {

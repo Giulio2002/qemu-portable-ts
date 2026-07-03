@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the latest published minor release line of `@org/qemu` and its platform
+Only the latest published minor release line of `qemu-portable` and its platform
 packages receives security updates. The vendored QEMU version for each
 release is recorded in every platform package's `build-info.json` and in the
 release notes.

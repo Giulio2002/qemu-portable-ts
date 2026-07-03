@@ -1,5 +1,5 @@
 {
-  "name": "@org/qemu-linux-arm64",
+  "name": "@qemu-portable/linux-arm64",
   "version": "0.1.0",
   "description": "Vendored QEMU binaries for Linux arm64 glibc",
   "os": [
@@ -8,7 +8,9 @@
   "cpu": [
     "arm64"
   ],
-  "libc": "glibc",
+  "libc": [
+    "glibc"
+  ],
   "type": "module",
   "files": [
     "bin",
@@ -19,7 +21,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/org/qemu-ts.git"
+    "url": "https://github.com/Giulio2002/qemu-portable-ts.git"
   },
   "license": "GPL-2.0-only"
 }

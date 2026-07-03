@@ -38,11 +38,19 @@ if (-not (Test-Path "qemu-$QemuVersion")) {
 }
 
 # --- Configure and build under MSYS2 ------------------------------------------
-# QEMU's Windows build runs through the MSYS2 shell; --enable-whpx is implied
-# by the w64 target when the SDK is present. The MSYS2 environment is selected
-# per architecture: MINGW64 for x64, CLANGARM64 for Windows on ARM.
+# QEMU's Windows build runs through the MSYS2 shell. WHPX is enabled
+# explicitly so configure FAILS if the Windows Hypervisor Platform headers
+# are missing, instead of silently shipping a TCG-only build (the TS args
+# layer emits -accel whpx fallback chains and expects it compiled in). The
+# MSYS2 environment is selected per architecture: MINGW64 for x64,
+# CLANGARM64 for Windows on ARM.
 $MsysEnv = if ($env:QEMU_MSYS_ENV) { $env:QEMU_MSYS_ENV } else { "MINGW64" }
 $ConfigureArgs = "--target-list=$TargetList --disable-docs --disable-werror --disable-gtk --disable-sdl --enable-slirp"
+if ($MsysEnv -ne "CLANGARM64") {
+    # QEMU's WHPX accelerator only exists for x86 hosts; win32-arm64 is
+    # TCG-only until upstream grows aarch64 WHPX support.
+    $ConfigureArgs += " --enable-whpx"
+}
 $BuildScript = @"
 set -e
 cd '$($WorkDir -replace '\\','/')/qemu-$QemuVersion'
@@ -69,6 +77,7 @@ foreach ($bin in $Binaries) {
     Copy-Item (Join-Path $BuildDir $bin) $BinDir
 }
 Copy-Item -Recurse (Join-Path $BuildDir "pc-bios/*") $ShareDir
+node --experimental-strip-types (Join-Path $RepoRoot "scripts/prune-firmware.ts") $PackageDir
 
 # DLLs live next to the executables on Windows.
 node --experimental-strip-types (Join-Path $RepoRoot "scripts/collect-runtime-deps.ts") $PackageDir

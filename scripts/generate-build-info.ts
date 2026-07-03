@@ -6,7 +6,7 @@
  *     --qemu-version 10.0.2 --git-ref v10.0.2 --source-sha256 <hex> \
  *     --configure-args "--target-list=...;--disable-docs" --patches "a.patch;b.patch"
  */
-import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -45,6 +45,43 @@ const runtimeDependencies = [
     : []),
 ].sort();
 
+// --- feature flags -------------------------------------------------------------
+// Derived at build time from what was actually configured/installed, so the
+// runtime API (getQemuFeatures) reports facts, not guesses.
+const manifest = JSON.parse(
+  readFileSync(join(packageDir, "package.json"), "utf8")
+) as { os?: string[] };
+const packageOs = manifest.os?.[0] ?? process.platform;
+
+const configureArgs = splitList(flag("configure-args"));
+const enabled = (feature: string): boolean =>
+  configureArgs.includes(`--enable-${feature}`);
+const disabled = (feature: string): boolean =>
+  configureArgs.includes(`--disable-${feature}`);
+
+// tcg is always compiled in. kvm is autodetected default-on for Linux
+// builds; hvf/whpx are only claimed when the build script passed the
+// explicit enable flag (win32-arm64 has no WHPX upstream, so it never does).
+const accelerators = ["tcg"];
+if (packageOs === "linux" && !disabled("kvm")) accelerators.push("kvm");
+if (packageOs === "darwin" && enabled("hvf")) accelerators.push("hvf");
+if (packageOs === "win32" && enabled("whpx")) accelerators.push("whpx");
+
+// Local dev fills (vendor-local-qemu.ts) pass a marker instead of real
+// configure args; there the flags cannot be derived, so features is omitted
+// and the runtime API falls back to platform assumptions.
+const realConfigureArgs = configureArgs.some((a) => a.startsWith("--"));
+const features = realConfigureArgs
+  ? {
+      guestTargets: targets
+        .filter((t) => t.startsWith("qemu-system-"))
+        .map((t) => t.replace("qemu-system-", "")),
+      accelerators,
+      networking: { slirp: enabled("slirp") },
+      display: { gtk: enabled("gtk"), sdl: enabled("sdl") },
+    }
+  : undefined;
+
 const buildInfo = {
   qemuVersion: flag("qemu-version") ?? "unknown",
   qemuGitRef: flag("git-ref") ?? "unknown",
@@ -53,7 +90,8 @@ const buildInfo = {
     : hostname(),
   builtAt: new Date().toISOString(),
   targets,
-  configureArgs: splitList(flag("configure-args")),
+  configureArgs,
+  features,
   runtimeDependencies,
   sourceArchiveSha256: flag("source-sha256"),
   patches: splitList(flag("patches")),

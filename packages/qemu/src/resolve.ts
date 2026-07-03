@@ -18,6 +18,13 @@ export interface QemuBuildInfo {
   builtAt: string;
   targets: QemuCommandName[];
   configureArgs: string[];
+  /** Build-time feature flags (see getQemuFeatures); absent in dev fills. */
+  features?: {
+    guestTargets: string[];
+    accelerators: string[];
+    networking: { slirp: boolean };
+    display: { gtk: boolean; sdl: boolean };
+  };
   runtimeDependencies: string[];
   sourceArchiveSha256?: string;
   patches?: string[];
@@ -29,6 +36,14 @@ export interface ResolvedQemuBinary {
   packageName: string;
   packageRoot: string;
   hostPlatform: HostPlatform;
+  /**
+   * Directory holding QEMU's firmware/keymap data (the package's
+   * share/qemu). Pass it as `-L <firmwareDir>` when spawning the binary
+   * yourself; the managed spawnQemu() path injects it automatically.
+   * Undefined for binaries resolved from PATH or packages without data.
+   */
+  firmwareDir?: string;
+  /** @deprecated Alias of {@link firmwareDir}; kept for compatibility. */
   qemuDataDir?: string;
   version?: string;
   buildInfo?: QemuBuildInfo;
@@ -118,8 +133,24 @@ function missingBinaryMessage(
     `contain "${command}".\n\n` +
     `Expected binary path:\n  ${binaryPath}\n\n` +
     `This build of the platform package may not include that guest target. ` +
-    `Run "qemu-ts diagnostics" to list the binaries that are available.`
+    `Run "qemu-portable diagnostics" to list the binaries that are available.`
   );
+}
+
+/**
+ * True when an installed platform package is a registry placeholder (see
+ * scripts/make-placeholder-package.ts): it resolves like the real package
+ * but ships no binaries.
+ */
+export function isPlaceholderPackage(packageRoot: string): boolean {
+  try {
+    const manifest = JSON.parse(
+      readFileSync(join(packageRoot, "package.json"), "utf8")
+    ) as { qemuPortable?: { placeholder?: boolean } };
+    return manifest.qemuPortable?.placeholder === true;
+  } catch {
+    return false;
+  }
 }
 
 function readBuildInfo(packageRoot: string): QemuBuildInfo | undefined {
@@ -193,6 +224,13 @@ export function resolveQemuBinary(
 
   const binaryPath = join(packageRoot, "bin", exe);
   if (!existsSync(binaryPath)) {
+    if (isPlaceholderPackage(packageRoot)) {
+      throw new QemuBinaryNotFoundError(
+        `${packageName} is installed but is a placeholder: no QEMU binaries ` +
+          `have been published for ${platform} yet.\n` +
+          `Check https://github.com/Giulio2002/qemu-portable-ts for platform status.`
+      );
+    }
     throw new QemuBinaryNotFoundError(
       missingBinaryMessage(command, packageName, binaryPath)
     );
@@ -200,6 +238,7 @@ export function resolveQemuBinary(
 
   const dataDir = join(packageRoot, "share", "qemu");
   const buildInfo = readBuildInfo(packageRoot);
+  const firmwareDir = existsSync(dataDir) ? dataDir : undefined;
 
   return {
     command,
@@ -207,7 +246,8 @@ export function resolveQemuBinary(
     packageName,
     packageRoot,
     hostPlatform: platform,
-    qemuDataDir: existsSync(dataDir) ? dataDir : undefined,
+    firmwareDir,
+    qemuDataDir: firmwareDir,
     version: buildInfo?.qemuVersion,
     buildInfo,
   };

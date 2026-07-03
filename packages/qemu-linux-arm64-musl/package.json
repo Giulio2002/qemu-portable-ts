@@ -1,0 +1,27 @@
+{
+  "name": "@qemu-portable/linux-arm64-musl",
+  "version": "0.1.0",
+  "description": "Vendored QEMU binaries for Linux arm64 musl (Alpine)",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "musl"
+  ],
+  "type": "module",
+  "files": [
+    "bin",
+    "lib",
+    "share/qemu",
+    "licenses",
+    "build-info.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Giulio2002/qemu-portable-ts.git"
+  },
+  "license": "GPL-2.0-only"
+}

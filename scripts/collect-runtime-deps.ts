@@ -28,8 +28,8 @@ if (!packageDir || !existsSync(join(packageDir, "package.json"))) {
 // System libraries that must NOT be bundled: they belong to the OS and are
 // either non-redistributable or guaranteed present.
 const LINUX_SYSTEM_PREFIXES = [
-  "linux-vdso", "ld-linux", "libc.so", "libm.so", "libdl.so", "librt.so",
-  "libpthread.so", "libresolv.so", "libgcc_s.so", "libstdc++.so",
+  "linux-vdso", "ld-linux", "ld-musl", "libc.so", "libm.so", "libdl.so",
+  "librt.so", "libpthread.so", "libresolv.so", "libgcc_s.so", "libstdc++.so",
 ];
 const DARWIN_SYSTEM_PREFIXES = ["/usr/lib/", "/System/Library/"];
 const WINDOWS_SYSTEM_DLLS = new Set([

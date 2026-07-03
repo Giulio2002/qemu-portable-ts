@@ -1,18 +1,18 @@
-# @org/qemu — bundled QEMU for Node.js
+# qemu-portable — bundled QEMU for Node.js
 
 A Node.js TypeScript library that ships QEMU through platform-specific npm
 packages. Install one package, run QEMU — **no global QEMU installation
 required**.
 
 ```bash
-npm install @org/qemu
+npm install qemu-portable
 ```
 
 This is not a pure TypeScript QEMU implementation. It is a TypeScript control
 layer over vendored native QEMU binaries:
 
 ```txt
-Node.js app -> @org/qemu -> @org/qemu-<platform> -> vendored QEMU binary
+Node.js app -> qemu-portable -> @qemu-portable/<platform> -> vendored QEMU binary
 ```
 
 The root package exposes the API and declares platform packages as
@@ -25,16 +25,22 @@ architecture, and (on Linux) libc.
 
 ## Supported platforms
 
-| Host platform | Binary package |
-|---|---|
-| Linux x64 (glibc) | `@org/qemu-linux-x64` |
-| Linux arm64 (glibc) | `@org/qemu-linux-arm64` |
-| macOS arm64 | `@org/qemu-darwin-arm64` |
-| macOS x64 | `@org/qemu-darwin-x64` |
-| Windows x64 | `@org/qemu-win32-x64` |
+| Host platform | Binary package | Host accelerator |
+|---|---|---|
+| Linux x64 (glibc) | `@qemu-portable/linux-x64` | kvm |
+| Linux arm64 (glibc) | `@qemu-portable/linux-arm64` | kvm |
+| Linux x64 (musl/Alpine) | `@qemu-portable/linux-x64-musl` | kvm |
+| Linux arm64 (musl/Alpine) | `@qemu-portable/linux-arm64-musl` | kvm |
+| macOS arm64 | `@qemu-portable/darwin-arm64` | hvf |
+| macOS x64 | `@qemu-portable/darwin-x64` | hvf |
+| Windows x64 | `@qemu-portable/win32-x64` | whpx |
+| Windows arm64 | `@qemu-portable/win32-arm64` | tcg only (no WHPX upstream) |
 
-Planned after MVP: `linux-x64-musl`, `linux-arm64-musl`, `win32-arm64`,
-`freebsd-x64`.
+All eight are built from the same pinned QEMU source in CI, and every build
+must boot a real guest to a serial `BOOT-OK` (TCG) before it can be
+published. Platforms without published binaries ship a registry
+*placeholder* package so installs never 404 — `checkHostSupport()` reports
+them as unsupported. Planned: `freebsd-x64`.
 
 **Guest targets** shipped in each platform package: `qemu-system-x86_64`,
 `qemu-system-aarch64`, and `qemu-img`. More targets (`riscv64`, `arm`,
@@ -45,7 +51,7 @@ Planned after MVP: `linux-x64-musl`, `linux-arm64-musl`, `win32-arm64`,
 ### Disk images with `qemu-img`
 
 ```ts
-import { qemuImg } from "@org/qemu";
+import { qemuImg } from "qemu-portable";
 
 await qemuImg.create({ path: "./disk.qcow2", size: "20G", format: "qcow2" });
 
@@ -59,7 +65,7 @@ await qemuImg.resize({ path: "./disk.qcow2", size: "+5G" });
 ### Booting a VM
 
 ```ts
-import { createVm, qemuImg } from "@org/qemu";
+import { createVm, qemuImg } from "qemu-portable";
 
 await qemuImg.create({ path: "./disk.qcow2", size: "20G", format: "qcow2" });
 
@@ -85,10 +91,42 @@ const proc = vm.start({ stdio: "inherit" });
 await proc.wait();
 ```
 
+### Running commands inside the guest (`vm.exec`)
+
+Enable the QEMU Guest Agent and run commands in the guest, capturing output —
+like `docker exec`, but for a full VM:
+
+```ts
+import { createVm } from "qemu-portable";
+
+const vm = createVm({
+  target: "x86_64",
+  memory: "2G",
+  acceleration: "auto",
+  disks: [{ path: "./ubuntu-cloud.qcow2", format: "qcow2", interface: "virtio" }],
+  guestAgent: true,          // wires the guest-agent virtio-serial channel
+});
+vm.start();
+
+// A string runs through a shell, so &&, pipes, and redirection work:
+const { exitCode, stdout } = await vm.exec("ls -la / && cd /etc && cat os-release");
+console.log(exitCode, stdout);
+
+// An argv array runs a binary directly, no shell:
+await vm.exec(["/usr/bin/systemctl", "status", "nginx"]);
+```
+
+**Requirement:** the guest OS must have `qemu-guest-agent` installed and
+running (and, on some distros, `guest-exec` enabled in its config). Cloud
+images ship it or install it via cloud-init. A blank disk has no agent to talk
+to. Without a guest agent, use SSH instead (see the `hostForwards` example
+above) — `vm.exec` reports a clear `GuestAgentError` if the agent never
+answers.
+
 ### Controlling a VM over QMP
 
 ```ts
-import { QmpClient, createVm } from "@org/qemu";
+import { QmpClient, createVm } from "qemu-portable";
 
 const vm = createVm({
   target: "x86_64",
@@ -111,7 +149,7 @@ QEMU's command-line surface is enormous; the typed API covers common
 workflows and never blocks the rest:
 
 ```ts
-import { execQemu, spawnQemu, qemuImg } from "@org/qemu";
+import { execQemu, spawnQemu, qemuImg } from "qemu-portable";
 
 await execQemu("qemu-system-x86_64", ["-machine", "help"]);
 await qemuImg.raw(["snapshot", "-l", "disk.qcow2"]);
@@ -121,22 +159,79 @@ await qemuImg.raw(["snapshot", "-l", "disk.qcow2"]);
 ### CLI
 
 ```bash
-npx qemu-ts diagnostics                          # platform/package/accelerator report
-npx qemu-ts version                              # vendored QEMU version
-npx qemu-ts which qemu-system-x86_64             # resolved binary path
-npx qemu-ts run qemu-img -- info disk.qcow2      # raw args after --
-npx qemu-ts run qemu-system-x86_64 -- -machine help
+npx qemu-portable diagnostics                          # platform/package/accelerator report
+npx qemu-portable features                             # build feature flags as JSON
+npx qemu-portable preflight                            # host-support check (exit 0 = usable)
+npx qemu-portable version                              # vendored QEMU version
+npx qemu-portable which qemu-system-x86_64             # resolved binary path
+npx qemu-portable run qemu-img -- info disk.qcow2      # raw args after --
+npx qemu-portable run qemu-system-x86_64 -- -machine help
 ```
 
 `run` prints the resolved vendored binary path, requires `--` before raw
 QEMU args, never falls back to system QEMU, and exits with QEMU's exit code.
+
+### Feature detection
+
+Ask what the vendored build supports before launching anything:
+
+```ts
+import { checkHostSupport, getQemuFeatures, getAcceleratorHints } from "qemu-portable";
+
+// Non-throwing preflight — every failure mode is data, never an exception:
+const support = checkHostSupport();
+if (!support.ok) console.error(support.reason);
+
+// Compiled-in capabilities, recorded at build time in build-info.json:
+const features = getQemuFeatures();
+features.guestTargets;          // ["x86_64", "aarch64"]
+features.accelerators;          // ["tcg", "hvf"] — compiled in, not necessarily usable
+features.networking.slirp;      // true
+
+// Host availability (is /dev/kvm accessible, etc.) is a separate question:
+getAcceleratorHints();
+```
+
+`listAvailableBinaries()` is also non-throwing and lists every binary the
+installed platform package actually ships.
+
+### Spawning QEMU yourself
+
+If you own your process lifecycle, you don't have to use `spawnQemu()`/
+`createVm()` — resolution gives you everything you need as data:
+
+```ts
+import { resolveQemuBinary, resolveRuntimeEnv } from "qemu-portable";
+import { spawn } from "node:child_process";
+
+const bin = resolveQemuBinary("qemu-system-x86_64");
+bin.path;         // absolute path to the vendored executable
+bin.firmwareDir;  // pass as -L so firmware/keymaps come from the package
+
+// Env additions (as data) for the bundled dynamic libraries. The binaries
+// are built self-contained (RPATH $ORIGIN/../lib on Linux, @loader_path
+// install names on macOS, DLLs beside the .exe on Windows) and CI enforces
+// that as a release invariant — so these are a genuine fallback, but apply
+// them for safety:
+const env = { ...process.env };
+for (const { name, value } of resolveRuntimeEnv(bin)) {
+  env[name] = env[name] ? `${value}:${env[name]}` : value;
+}
+
+spawn(bin.path, ["-L", bin.firmwareDir!, "-machine", "q35", /* ... */], { env });
+```
 
 ## How vendored binaries work
 
 Each platform package contains `bin/` (QEMU executables), `lib/` (bundled
 dynamic libraries with package-relative lookup paths), `share/qemu/`
 (firmware, BIOS, and keymaps), `licenses/`, and `build-info.json` (exact QEMU
-version, git ref, configure args, and source checksum).
+version, git ref, configure args, feature flags, and source checksum).
+
+`share/qemu` is pruned to what the shipped guest targets can use (SeaBIOS,
+EDK2 for x86_64/aarch64, option ROMs, keymaps, dtbs) — firmware for
+architectures the package has no emulator for is dropped at build time
+(`scripts/prune-firmware.ts`), roughly halving the installed size.
 
 The resolver locates the installed platform package through normal
 `node_modules` resolution and the process layer always injects
@@ -153,7 +248,7 @@ images and CI configs sometimes set these flags globally — check there first.
 
 ## Licensing of the binaries (GPL)
 
-The `@org/qemu` wrapper is MIT. The `@org/qemu-*` binary packages
+The `qemu-portable` wrapper is MIT. The `@qemu-portable/*` binary packages
 redistribute QEMU and are licensed **GPL-2.0-only**; each one ships the full
 GPL text, QEMU license notes, third-party notices for bundled libraries, and
 a written source offer. Complete corresponding source (tarball, patches,
@@ -166,51 +261,33 @@ Running QEMU means running a large native process against potentially
 untrusted disk images, kernels, firmware, and guest code. **This package is
 not a sandbox**, especially in TCG (software emulation) mode. Defaults are
 conservative — headless display, no NIC unless requested, QMP over local IPC
-only — but the security boundary is yours to design. See
-[SECURITY.md](./SECURITY.md).
+only — but the security boundary is yours to design.
+
+- [SECURITY.md](./SECURITY.md) — reporting policy, supported versions, QEMU
+  update policy.
+- [docs/security.md](./docs/security.md) — **threat model, trust boundaries,
+  what the library validates vs. passes through, and a hardening checklist**
+  for handling untrusted input.
 
 ## Troubleshooting
 
 1. **`QemuBinaryNotFoundError`** — optional dependencies were omitted (see
-   above), or your platform isn't supported yet. Run `npx qemu-ts diagnostics`.
+   above), or your platform isn't supported yet. Run `npx qemu-portable diagnostics`.
 2. **Slow VMs** — the accelerator fell back to TCG. Check
-   `npx qemu-ts diagnostics` accelerator hints: on Linux you may need
+   `npx qemu-portable diagnostics` accelerator hints: on Linux you may need
    `kvm` group membership; on Windows the "Windows Hypervisor Platform"
    feature must be enabled.
 3. **`Could not access KVM kernel module`** — harmless when using
    `acceleration: "auto"`; QEMU falls back to the next accelerator.
 4. **Firmware not found** — don't pass your own `-L` unless you mean it; the
    library injects the vendored data dir automatically.
-5. **Alpine/musl** — not yet supported (`linux-*-musl` packages are a
-   post-MVP milestone).
-
-## Repository layout
-
-```
-packages/qemu             core TypeScript package (@org/qemu)
-packages/qemu-<platform>  binary packages (populated by CI builds)
-scripts/                  QEMU build, dependency-collection, verify, smoke tests
-third_party/qemu          pinned QEMU source version, checksums, patches
-.github/workflows         ci / build-binaries / release pipelines
-project.md                full project execution plan
-```
-
-## Development
-
-```bash
-npm install          # workspace install (core package only)
-npm run build        # tsc build of @org/qemu
-npm test             # unit tests (no QEMU binaries required)
-npm run verify:licenses
-
-# Build real binaries for your platform (needs QEMU build deps):
-scripts/build-qemu-macos.sh packages/qemu-darwin-arm64
-npm install --no-save ./packages/qemu-darwin-arm64
-npm run smoke
-```
+5. **Alpine/musl** — supported via `@qemu-portable/linux-{x64,arm64}-musl`;
+   npm selects the right flavor automatically from the `libc` field. If you
+   see the glibc package on Alpine, your npm is too old to understand `libc`
+   (needs npm ≥ 9).
 
 ## License
 
-MIT for the wrapper (`@org/qemu` and this repository's tooling);
+MIT for the wrapper (`qemu-portable` and this repository's tooling);
 GPL-2.0-only for the binary packages. See [LICENSE](./LICENSE) and
 [COMPLIANCE.md](./COMPLIANCE.md).

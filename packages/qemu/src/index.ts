@@ -2,6 +2,7 @@ export * from "./platform";
 export * from "./resolve";
 export * from "./process";
 export * from "./version";
+export * from "./features";
 export * from "./diagnostics";
 export * from "./qemu-img";
 export * from "./args";

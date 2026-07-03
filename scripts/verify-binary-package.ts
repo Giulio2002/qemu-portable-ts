@@ -5,6 +5,7 @@
  *
  * Usage: node --experimental-strip-types scripts/verify-binary-package.ts <package-dir>
  */
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   readFileSync,
@@ -13,6 +14,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 
+const repoRoot = resolve(import.meta.dirname, "..");
 const packageDir = resolve(process.argv[2] ?? "");
 const errors: string[] = [];
 const fail = (msg: string) => errors.push(msg);
@@ -29,7 +31,7 @@ const manifest = JSON.parse(
   version: string;
   os?: string[];
   cpu?: string[];
-  libc?: string;
+  libc?: string[];
   license?: string;
   files?: string[];
 };
@@ -37,6 +39,16 @@ const manifest = JSON.parse(
 // --- package.json metadata ----------------------------------------------------
 if (!manifest.os?.length) fail(`${manifest.name}: package.json is missing "os"`);
 if (!manifest.cpu?.length) fail(`${manifest.name}: package.json is missing "cpu"`);
+// Linux packages must declare libc so npm installs the right flavor on
+// Alpine vs glibc distros; the value must agree with the package name.
+if (manifest.os?.[0] === "linux") {
+  const expectedLibc = manifest.name.endsWith("-musl") ? "musl" : "glibc";
+  if (!Array.isArray(manifest.libc) || manifest.libc[0] !== expectedLibc)
+    fail(
+      `${manifest.name}: package.json "libc" must be ["${expectedLibc}"] ` +
+        `(got ${JSON.stringify(manifest.libc)})`
+    );
+}
 if (manifest.license !== "GPL-2.0-only")
   fail(`${manifest.name}: license must be "GPL-2.0-only" (got ${manifest.license})`);
 for (const required of ["bin", "share/qemu", "licenses", "build-info.json"]) {
@@ -65,6 +77,59 @@ for (const bin of expectedBinaries) {
     fail(`bin/${bin} is suspiciously small (${stat.size} bytes)`);
   if (!isWindows && !(stat.mode & 0o111))
     fail(`bin/${bin} is not executable (mode ${stat.mode.toString(8)})`);
+}
+
+// --- self-containedness invariant -------------------------------------------------
+// resolveRuntimeEnv() is documented as a *fallback*: the binaries must load
+// their bundled libraries via RPATH ($ORIGIN/../lib) on Linux and
+// @loader_path install names on macOS with no absolute references outside
+// the OS (Homebrew/MacPorts/build-tree paths are release blockers). Only
+// checkable on a matching host; the build jobs run this on the build host.
+const hostMatchesPackage =
+  (manifest.os?.[0] === "darwin" && process.platform === "darwin") ||
+  (manifest.os?.[0] === "linux" && process.platform === "linux");
+
+function tool(cmd: string, args: string[]): string | undefined {
+  const res = spawnSync(cmd, args, { encoding: "utf8" });
+  return res.status === 0 ? res.stdout : undefined;
+}
+
+if (hostMatchesPackage) {
+  for (const bin of expectedBinaries) {
+    const path = join(binDir, bin);
+    if (!existsSync(path)) continue;
+
+    if (process.platform === "darwin") {
+      const out = tool("otool", ["-L", path]);
+      if (out === undefined) {
+        fail(`could not run otool on bin/${bin}`);
+        continue;
+      }
+      for (const line of out.split("\n").slice(1)) {
+        const dep = line.trim().split(" ")[0];
+        if (!dep) continue;
+        const selfContained =
+          dep.startsWith("/usr/lib/") ||
+          dep.startsWith("/System/") ||
+          dep.startsWith("@loader_path/") ||
+          dep.startsWith("@executable_path/");
+        if (!selfContained)
+          fail(
+            `bin/${bin} links ${dep} — not self-contained ` +
+              `(must be @loader_path/../lib or an OS library)`
+          );
+      }
+    } else {
+      const rpath =
+        tool("patchelf", ["--print-rpath", path]) ??
+        tool("readelf", ["-d", path]);
+      if (rpath === undefined) {
+        fail(`could not inspect RPATH of bin/${bin} (need patchelf or readelf)`);
+      } else if (!rpath.includes("$ORIGIN/../lib")) {
+        fail(`bin/${bin} RPATH lacks $ORIGIN/../lib — bundled libs will not resolve`);
+      }
+    }
+  }
 }
 
 // --- QEMU data dir ---------------------------------------------------------------
@@ -97,6 +162,25 @@ if (existsSync(buildInfoPath)) {
   };
   if (!buildInfo.qemuVersion || buildInfo.qemuVersion === "unknown")
     fail("build-info.json: qemuVersion missing");
+  // The binary must come from the single pinned source. Local dev fills
+  // (scripts/vendor-local-qemu.ts) may bypass this with an explicit env var;
+  // CI/release never sets it.
+  const pinnedVersion = readFileSync(
+    join(repoRoot, "third_party", "qemu", "QEMU_VERSION"),
+    "utf8"
+  ).trim();
+  if (
+    buildInfo.qemuVersion &&
+    buildInfo.qemuVersion !== pinnedVersion &&
+    process.env.QEMU_ALLOW_VERSION_DRIFT !== "1"
+  )
+    fail(
+      `build-info.json: qemuVersion ${buildInfo.qemuVersion} does not match ` +
+        `the pin ${pinnedVersion} (third_party/qemu/QEMU_VERSION). ` +
+        `Set QEMU_ALLOW_VERSION_DRIFT=1 only for local dev fills.`
+    );
+  if (buildInfo.qemuGitRef?.includes("NOT FOR RELEASE") && process.env.QEMU_ALLOW_VERSION_DRIFT !== "1")
+    fail("build-info.json: package was populated by vendor-local-qemu.ts and must not be released");
   if (!/^[0-9a-f]{64}$/.test(buildInfo.sourceArchiveSha256 ?? ""))
     fail("build-info.json: sourceArchiveSha256 must be a sha256 hex digest");
   for (const target of ["qemu-system-x86_64", "qemu-system-aarch64", "qemu-img"]) {

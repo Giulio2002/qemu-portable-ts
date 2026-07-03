@@ -64,14 +64,14 @@ export function isKnownQemuCommand(value: unknown): value is QemuCommand {
 
 /** Maps a host platform to the npm package that vendors its binaries. */
 export const PLATFORM_PACKAGES: Record<HostPlatform, string> = {
-  "linux-x64": "@org/qemu-linux-x64",
-  "linux-arm64": "@org/qemu-linux-arm64",
-  "linux-x64-musl": "@org/qemu-linux-x64-musl",
-  "linux-arm64-musl": "@org/qemu-linux-arm64-musl",
-  "darwin-arm64": "@org/qemu-darwin-arm64",
-  "darwin-x64": "@org/qemu-darwin-x64",
-  "win32-x64": "@org/qemu-win32-x64",
-  "win32-arm64": "@org/qemu-win32-arm64",
+  "linux-x64": "@qemu-portable/linux-x64",
+  "linux-arm64": "@qemu-portable/linux-arm64",
+  "linux-x64-musl": "@qemu-portable/linux-x64-musl",
+  "linux-arm64-musl": "@qemu-portable/linux-arm64-musl",
+  "darwin-arm64": "@qemu-portable/darwin-arm64",
+  "darwin-x64": "@qemu-portable/darwin-x64",
+  "win32-x64": "@qemu-portable/win32-x64",
+  "win32-arm64": "@qemu-portable/win32-arm64",
 };
 
 export const SUPPORTED_PLATFORMS = Object.keys(
@@ -150,7 +150,7 @@ export function getHostPlatform(
   throw new UnsupportedPlatformError(
     `Unsupported host platform: ${platform}-${arch}.\n` +
       `Supported platforms: ${SUPPORTED_PLATFORMS.join(", ")}.\n` +
-      `QEMU must run as a native child process, so @org/qemu only works ` +
+      `QEMU must run as a native child process, so qemu-portable only works ` +
       `where a vendored binary package exists.`
   );
 }

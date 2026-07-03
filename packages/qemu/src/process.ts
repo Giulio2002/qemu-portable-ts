@@ -42,31 +42,57 @@ export interface QemuProcess {
 }
 
 /**
- * Builds the environment for a vendored QEMU process so its bundled dynamic
- * libraries resolve without any system package manager. RPATH/@loader_path
- * set at build time is the primary mechanism; these variables are a fallback
- * that also covers binaries whose install names were not rewritten.
+ * One environment-variable addition a self-spawning consumer should apply
+ * before exec'ing a vendored binary. `value` is prepended to any existing
+ * value of `name` with the platform's path delimiter.
+ */
+export interface RuntimeEnvAddition {
+  name: "LD_LIBRARY_PATH" | "DYLD_FALLBACK_LIBRARY_PATH" | "PATH";
+  value: string;
+}
+
+/**
+ * Returns the environment additions needed to run a vendored binary, as
+ * data, for consumers that own their process lifecycle and spawn QEMU
+ * themselves instead of going through spawnQemu().
+ *
+ * The binaries are built self-contained — RPATH `$ORIGIN/../lib` on Linux,
+ * `@loader_path/../lib` install names on macOS, DLLs beside the .exe on
+ * Windows — and scripts/verify-binary-package.ts enforces that as a release
+ * invariant. These variables are a genuine fallback (e.g. dlopen'd modules,
+ * binaries whose install names were not rewritten), not a requirement.
+ */
+export function resolveRuntimeEnv(
+  resolved: ResolvedQemuBinary
+): RuntimeEnvAddition[] {
+  const libDir = join(resolved.packageRoot, "lib");
+  const binDir = join(resolved.packageRoot, "bin");
+
+  if (resolved.hostPlatform.startsWith("linux") && existsSync(libDir)) {
+    return [{ name: "LD_LIBRARY_PATH", value: libDir }];
+  }
+  if (resolved.hostPlatform.startsWith("darwin") && existsSync(libDir)) {
+    return [{ name: "DYLD_FALLBACK_LIBRARY_PATH", value: libDir }];
+  }
+  if (resolved.hostPlatform.startsWith("win32")) {
+    // DLLs live next to the .exe; the bin dir on PATH covers any
+    // delay-loaded libraries.
+    return [{ name: "PATH", value: binDir }];
+  }
+  return [];
+}
+
+/**
+ * Builds the environment for a vendored QEMU process by applying
+ * {@link resolveRuntimeEnv}'s additions over a base environment.
  */
 export function buildLibraryEnv(
   resolved: ResolvedQemuBinary,
   base: NodeJS.ProcessEnv
 ): NodeJS.ProcessEnv {
   const env = { ...base };
-  const libDir = join(resolved.packageRoot, "lib");
-  const binDir = join(resolved.packageRoot, "bin");
-
-  if (resolved.hostPlatform.startsWith("linux") && existsSync(libDir)) {
-    env.LD_LIBRARY_PATH = env.LD_LIBRARY_PATH
-      ? `${libDir}${delimiter}${env.LD_LIBRARY_PATH}`
-      : libDir;
-  } else if (resolved.hostPlatform.startsWith("darwin") && existsSync(libDir)) {
-    env.DYLD_FALLBACK_LIBRARY_PATH = env.DYLD_FALLBACK_LIBRARY_PATH
-      ? `${libDir}${delimiter}${env.DYLD_FALLBACK_LIBRARY_PATH}`
-      : libDir;
-  } else if (resolved.hostPlatform.startsWith("win32")) {
-    // DLLs live next to the .exe; make sure the bin dir is on PATH for any
-    // delay-loaded libraries.
-    env.PATH = env.PATH ? `${binDir}${delimiter}${env.PATH}` : binDir;
+  for (const { name, value } of resolveRuntimeEnv(resolved)) {
+    env[name] = env[name] ? `${value}${delimiter}${env[name]}` : value;
   }
   return env;
 }
@@ -151,14 +177,15 @@ export function spawnQemu(
 ): QemuProcess {
   const resolved = options.resolved ?? resolveQemuBinary(command, options.resolve);
 
+  const firmwareDir = resolved.firmwareDir ?? resolved.qemuDataDir;
   const injectDataDir =
     !options.noDataDir &&
     command.startsWith("qemu-system-") &&
-    resolved.qemuDataDir !== undefined &&
+    firmwareDir !== undefined &&
     !args.includes("-L");
 
   const finalArgs = injectDataDir
-    ? ["-L", resolved.qemuDataDir as string, ...args]
+    ? ["-L", firmwareDir as string, ...args]
     : [...args];
 
   const env = buildLibraryEnv(resolved, {

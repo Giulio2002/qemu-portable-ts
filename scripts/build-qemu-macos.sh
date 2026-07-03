@@ -70,6 +70,7 @@ for bin in "${BINARIES[@]}"; do
   cp "$DESTDIR/usr/bin/$bin" "$PACKAGE_DIR/bin/"
 done
 cp -R "$DESTDIR/usr/share/qemu" "$PACKAGE_DIR/share/qemu"
+node --experimental-strip-types "$REPO_ROOT/scripts/prune-firmware.ts" "$PACKAGE_DIR"
 
 # Bundle dylibs and rewrite install names to @loader_path/../lib.
 node --experimental-strip-types "$REPO_ROOT/scripts/collect-runtime-deps.ts" "$PACKAGE_DIR"

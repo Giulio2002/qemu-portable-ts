@@ -1,6 +1,6 @@
 /**
  * Smoke-tests the vendored QEMU binaries for the current host platform
- * through the real @org/qemu API (project.md §13.3): no multi-GB images,
+ * through the real qemu-portable API (project.md §13.3): no multi-GB images,
  * just process startup, -machine help, and a qemu-img create/info/check
  * round-trip on a temporary image.
  *

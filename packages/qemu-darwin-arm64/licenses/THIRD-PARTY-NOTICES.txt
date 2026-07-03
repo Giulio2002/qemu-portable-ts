@@ -1,7 +1,7 @@
 THIRD-PARTY NOTICES
 ===================
 
-This package (@org/qemu-darwin-arm64) redistributes QEMU (GPL-2.0-only; see
+This package (@qemu-portable/darwin-arm64) redistributes QEMU (GPL-2.0-only; see
 GPL-2.0.txt and QEMU-LICENSE.txt) together with the following dynamic
 libraries collected at build time:
 
@@ -11,9 +11,6 @@ libraries collected at build time:
   libcrypto.3.dylib
     source: /opt/homebrew/opt/openssl@3/lib/libcrypto.3.dylib
     license: Apache-2.0
-  libfdt.1.dylib
-    source: /opt/homebrew/opt/dtc/lib/libfdt.1.dylib
-    license: GPL-2.0-or-later OR BSD-2-Clause
   libgio-2.0.0.dylib
     source: /opt/homebrew/opt/glib/lib/libgio-2.0.0.dylib
     license: LGPL-2.1-or-later
@@ -44,12 +41,6 @@ libraries collected at build time:
   libjpeg.8.dylib
     source: /opt/homebrew/opt/jpeg-turbo/lib/libjpeg.8.dylib
     license: IJG
-  liblzo2.2.dylib
-    source: /opt/homebrew/opt/lzo/lib/liblzo2.2.dylib
-    license: Zlib
-  libncursesw.6.dylib
-    source: /opt/homebrew/opt/ncurses/lib/libncursesw.6.dylib
-    license: MIT-open-group
   libnettle.9.dylib
     source: /opt/homebrew/opt/nettle/lib/libnettle.9.dylib
     license: LGPL-3.0-or-later OR GPL-2.0-or-later
@@ -68,9 +59,6 @@ libraries collected at build time:
   libslirp.0.dylib
     source: /opt/homebrew/opt/libslirp/lib/libslirp.0.dylib
     license: BSD-3-Clause
-  libsnappy.1.dylib
-    source: /opt/homebrew/opt/snappy/lib/libsnappy.1.dylib
-    license: BSD-3-Clause
   libssh.4.dylib
     source: /opt/homebrew/opt/libssh/lib/libssh.4.dylib
     license: LGPL-2.1-or-later
@@ -82,9 +70,6 @@ libraries collected at build time:
     license: LGPL-3.0-or-later OR GPL-2.0-or-later
   libusb-1.0.0.dylib
     source: /opt/homebrew/opt/libusb/lib/libusb-1.0.0.dylib
-    license: LGPL-2.1-or-later
-  libvdeplug.3.dylib
-    source: /opt/homebrew/opt/vde/lib/libvdeplug.3.dylib
     license: LGPL-2.1-or-later
   libzstd.1.dylib
     source: /opt/homebrew/opt/zstd/lib/libzstd.1.dylib

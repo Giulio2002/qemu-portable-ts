@@ -1,5 +1,5 @@
 {
-  "name": "@org/qemu",
+  "name": "qemu-portable",
   "version": "0.1.0",
   "description": "TypeScript API for vendored QEMU binaries",
   "type": "commonjs",
@@ -14,7 +14,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "qemu-ts": "./dist/cli.js"
+    "qemu-portable": "./dist/cli.js"
   },
   "files": [
     "dist",
@@ -32,12 +32,14 @@
     "test": "node run-tests.js"
   },
   "optionalDependencies": {
-    "@org/qemu-linux-x64": "0.1.0",
-    "@org/qemu-linux-arm64": "0.1.0",
-    "@org/qemu-darwin-arm64": "0.1.0",
-    "@org/qemu-darwin-x64": "0.1.0",
-    "@org/qemu-win32-x64": "0.1.0",
-    "@org/qemu-win32-arm64": "0.1.0"
+    "@qemu-portable/linux-x64": "0.1.0",
+    "@qemu-portable/linux-arm64": "0.1.0",
+    "@qemu-portable/linux-x64-musl": "0.1.0",
+    "@qemu-portable/linux-arm64-musl": "0.1.0",
+    "@qemu-portable/darwin-arm64": "0.1.0",
+    "@qemu-portable/darwin-x64": "0.1.0",
+    "@qemu-portable/win32-x64": "0.1.0",
+    "@qemu-portable/win32-arm64": "0.1.0"
   },
   "license": "MIT"
 }

@@ -3,9 +3,9 @@
 This document is the engineering companion to [`SECURITY.md`](../SECURITY.md).
 `SECURITY.md` is the policy (how to report, what is supported); this guide is
 the **threat model, trust boundaries, and hardening checklist** for people
-building on `@org/qemu`.
+building on `qemu-portable`.
 
-The single most important sentence: **`@org/qemu` is not a sandbox.** It
+The single most important sentence: **`qemu-portable` is not a sandbox.** It
 launches a large native process (QEMU) against inputs you may not control. It
 adds safe defaults and input validation around QEMU; it does not add an
 isolation boundary that QEMU itself doesn't provide.
@@ -59,7 +59,7 @@ isolation boundary that QEMU itself doesn't provide.
         │
         │  VmConfig / command names / qemu-img paths
         ▼
-   @org/qemu API                                  ← validates + escapes typed fields,
+   qemu-portable API                                  ← validates + escapes typed fields,
         │                                            enforces the command allowlist,
         │  argv array (shell: false)                 injects -L, keeps QMP local-only
         ▼
@@ -133,7 +133,7 @@ input.
 ### Audit the exact command line before starting
 
 ```ts
-import { createVm } from "@org/qemu";
+import { createVm } from "qemu-portable";
 
 const vm = createVm(configFromRequest);
 const { command, args } = vm.build();   // pure: nothing has run yet
@@ -160,7 +160,7 @@ network: {
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { QmpClient, createVm } from "@org/qemu";
+import { QmpClient, createVm } from "qemu-portable";
 
 const dir = mkdtempSync(join(tmpdir(), "vm-"));   // 0700 by default
 const socketPath = join(dir, "qmp.sock");

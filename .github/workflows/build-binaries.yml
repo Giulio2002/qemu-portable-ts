@@ -18,6 +18,18 @@ jobs:
             package: qemu-linux-arm64
             host: linux-arm64-glibc
             script: scripts/build-qemu-linux.sh
+          # musl builds run inside an Alpine container so the toolchain,
+          # ldd output, and smoke tests are all genuinely musl.
+          - os: ubuntu-24.04
+            package: qemu-linux-x64-musl
+            host: linux-x64-musl
+            script: scripts/build-qemu-linux.sh
+            container: alpine:3.21
+          - os: ubuntu-24.04-arm
+            package: qemu-linux-arm64-musl
+            host: linux-arm64-musl
+            script: scripts/build-qemu-linux.sh
+            container: alpine:3.21
           - os: macos-15
             package: qemu-darwin-arm64
             host: darwin-arm64
@@ -39,14 +51,28 @@ jobs:
             msystem: CLANGARM64
             mingw_prefix: mingw-w64-clang-aarch64
     runs-on: ${{ matrix.os }}
+    # Empty for non-musl entries → runs directly on the runner.
+    container: ${{ matrix.container }}
     steps:
+      # Alpine container: everything (node included) comes from apk; the
+      # runner-provided node is glibc-linked and must not be used.
+      - name: Install build dependencies (Alpine/musl)
+        if: matrix.container != ''
+        run: |
+          apk add --no-cache \
+            bash curl git tar xz coreutils build-base linux-headers \
+            ninja meson pkgconf python3 py3-setuptools py3-pip \
+            glib-dev pixman-dev libslirp-dev patchelf \
+            nodejs npm
+
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
+        if: matrix.container == ''
         with:
           node-version: 22
 
-      - name: Install build dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install build dependencies (Linux glibc)
+        if: runner.os == 'Linux' && matrix.container == ''
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -95,6 +121,11 @@ jobs:
           npm run build
           npm install --no-save ./packages/${{ matrix.package }}
           node --experimental-strip-types scripts/smoke-test.ts
+
+      # Boot a real guest (self-generated payloads, TCG) to serial "BOOT-OK".
+      # This is what proves a published binary actually runs a guest.
+      - name: Boot smoke test on the build host
+        run: node --experimental-strip-types scripts/boot-test.ts
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
