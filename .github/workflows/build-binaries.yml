@@ -2,60 +2,54 @@ name: build-binaries
 
 on:
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: >-
+          Comma-separated package names to build (e.g.
+          "qemu-win32-x64,qemu-win32-arm64"), or "all". Lets a failed
+          platform be retried without rebuilding the whole matrix.
+        required: false
+        default: all
+        type: string
   workflow_call:
 
 jobs:
+  # The platform list lives in build-matrix.json (see comments below on the
+  # musl entries). This job filters it by the `platforms` dispatch input so a
+  # single failed platform can be retried cheaply; workflow_call (release)
+  # always gets the full list.
+  #
+  # musl notes: those builds run inside an Alpine container driven via
+  # `docker run` (not `container:` — JavaScript actions don't work in Alpine
+  # containers on arm64 runners), so the toolchain, ldd output, and smoke
+  # tests are all genuinely musl while checkout/upload stay on the glibc
+  # host. The image is node:22-alpine, not plain alpine: Alpine's distro
+  # nodejs is built without TypeScript strip-types support
+  # (ERR_NO_TYPESCRIPT); the official Node image on the same musl base has it.
+  matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      include: ${{ steps.filter.outputs.include }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        env:
+          PLATFORMS: ${{ inputs.platforms || 'all' }}
+        run: |
+          include=$(jq -c --arg p "$PLATFORMS" '
+            if $p == "all" or $p == "" then .
+            else [ .[] | select(.package as $pkg | ($p | split(",") | index($pkg)) != null) ]
+            end' .github/workflows/build-matrix.json)
+          echo "filtered matrix: $include"
+          test "$include" != "[]" || { echo "platforms input matched nothing"; exit 1; }
+          echo "include=$include" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: matrix
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-24.04
-            package: qemu-linux-x64
-            host: linux-x64-glibc
-            script: scripts/build-qemu-linux.sh
-          - os: ubuntu-24.04-arm
-            package: qemu-linux-arm64
-            host: linux-arm64-glibc
-            script: scripts/build-qemu-linux.sh
-          # musl builds run inside an Alpine container driven via docker run
-          # (not `container:` — JavaScript actions don't work in Alpine
-          # containers on arm64 runners), so the toolchain, ldd output, and
-          # smoke tests are all genuinely musl while checkout/upload stay on
-          # the glibc host.
-          # node:22-alpine, not plain alpine: Alpine's distro nodejs is built
-          # without TypeScript strip-types support (ERR_NO_TYPESCRIPT); the
-          # official Node image on the same musl base has it.
-          - os: ubuntu-24.04
-            package: qemu-linux-x64-musl
-            host: linux-x64-musl
-            script: scripts/ci-alpine-musl.sh
-            musl_image: node:22-alpine
-          - os: ubuntu-24.04-arm
-            package: qemu-linux-arm64-musl
-            host: linux-arm64-musl
-            script: scripts/ci-alpine-musl.sh
-            musl_image: node:22-alpine
-          - os: macos-15
-            package: qemu-darwin-arm64
-            host: darwin-arm64
-            script: scripts/build-qemu-macos.sh
-          - os: macos-13
-            package: qemu-darwin-x64
-            host: darwin-x64
-            script: scripts/build-qemu-macos.sh
-          - os: windows-2025
-            package: qemu-win32-x64
-            host: win32-x64
-            script: scripts/build-qemu-windows.ps1
-            msystem: MINGW64
-            mingw_prefix: mingw-w64-x86_64
-          - os: windows-11-arm
-            package: qemu-win32-arm64
-            host: win32-arm64
-            script: scripts/build-qemu-windows.ps1
-            msystem: CLANGARM64
-            mingw_prefix: mingw-w64-clang-aarch64
+        include: ${{ fromJSON(needs.matrix.outputs.include) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

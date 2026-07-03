@@ -1,0 +1,56 @@
+[
+  {
+    "os": "ubuntu-24.04",
+    "package": "qemu-linux-x64",
+    "host": "linux-x64-glibc",
+    "script": "scripts/build-qemu-linux.sh"
+  },
+  {
+    "os": "ubuntu-24.04-arm",
+    "package": "qemu-linux-arm64",
+    "host": "linux-arm64-glibc",
+    "script": "scripts/build-qemu-linux.sh"
+  },
+  {
+    "os": "ubuntu-24.04",
+    "package": "qemu-linux-x64-musl",
+    "host": "linux-x64-musl",
+    "script": "scripts/ci-alpine-musl.sh",
+    "musl_image": "node:22-alpine"
+  },
+  {
+    "os": "ubuntu-24.04-arm",
+    "package": "qemu-linux-arm64-musl",
+    "host": "linux-arm64-musl",
+    "script": "scripts/ci-alpine-musl.sh",
+    "musl_image": "node:22-alpine"
+  },
+  {
+    "os": "macos-15",
+    "package": "qemu-darwin-arm64",
+    "host": "darwin-arm64",
+    "script": "scripts/build-qemu-macos.sh"
+  },
+  {
+    "os": "macos-13",
+    "package": "qemu-darwin-x64",
+    "host": "darwin-x64",
+    "script": "scripts/build-qemu-macos.sh"
+  },
+  {
+    "os": "windows-2025",
+    "package": "qemu-win32-x64",
+    "host": "win32-x64",
+    "script": "scripts/build-qemu-windows.ps1",
+    "msystem": "MINGW64",
+    "mingw_prefix": "mingw-w64-x86_64"
+  },
+  {
+    "os": "windows-11-arm",
+    "package": "qemu-win32-arm64",
+    "host": "win32-arm64",
+    "script": "scripts/build-qemu-windows.ps1",
+    "msystem": "CLANGARM64",
+    "mingw_prefix": "mingw-w64-clang-aarch64"
+  }
+]

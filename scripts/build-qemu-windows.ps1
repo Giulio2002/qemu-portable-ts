@@ -9,6 +9,9 @@ param(
     [Parameter(Mandatory = $true)][string]$PackageDir
 )
 $ErrorActionPreference = "Stop"
+# Make native commands (node, curl, tar) fail the script on non-zero exit;
+# without this a failing verification step is silently swallowed.
+$PSNativeCommandUseErrorActionPreference = $true
 
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $PackageDir = Resolve-Path $PackageDir
@@ -75,6 +78,11 @@ done
 mkdir -p build && cd build
 ../configure $ConfigureArgs
 make -j`$(nproc)
+# Stage a full install: build/pc-bios/ only holds generated files, the
+# prebuilt firmware blobs (SeaBIOS, VGA/option ROMs) are only laid out by
+# make install.
+rm -rf dest
+make install DESTDIR="`$PWD/dest"
 "@
 # MSYSTEM tells the MSYS2 login shell which toolchain environment to load.
 $env:MSYSTEM = $MsysEnv
@@ -83,15 +91,16 @@ if ($LASTEXITCODE -ne 0) { throw "QEMU build failed (exit $LASTEXITCODE)" }
 
 # --- Assemble the package -------------------------------------------------------
 $BuildDir = Join-Path $WorkDir "qemu-$QemuVersion/build"
+$DestDir = Join-Path $BuildDir "dest"
 $BinDir = Join-Path $PackageDir "bin"
 $ShareDir = Join-Path $PackageDir "share/qemu"
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $BinDir, $ShareDir
 New-Item -ItemType Directory -Force -Path $BinDir, $ShareDir | Out-Null
 
 foreach ($bin in $Binaries) {
-    Copy-Item (Join-Path $BuildDir $bin) $BinDir
+    Copy-Item (Join-Path $DestDir "usr/bin/$bin") $BinDir
 }
-Copy-Item -Recurse (Join-Path $BuildDir "pc-bios/*") $ShareDir
+Copy-Item -Recurse (Join-Path $DestDir "usr/share/qemu/*") $ShareDir
 node --experimental-strip-types (Join-Path $RepoRoot "scripts/prune-firmware.ts") $PackageDir
 
 # DLLs live next to the executables on Windows. collect-runtime-deps needs
