@@ -78,11 +78,6 @@ done
 mkdir -p build && cd build
 ../configure $ConfigureArgs
 make -j`$(nproc)
-# Stage a full install: build/pc-bios/ only holds generated files, the
-# prebuilt firmware blobs (SeaBIOS, VGA/option ROMs) are only laid out by
-# make install.
-rm -rf dest
-make install DESTDIR="`$PWD/dest"
 "@
 # MSYSTEM tells the MSYS2 login shell which toolchain environment to load.
 $env:MSYSTEM = $MsysEnv
@@ -90,17 +85,27 @@ $env:MSYSTEM = $MsysEnv
 if ($LASTEXITCODE -ne 0) { throw "QEMU build failed (exit $LASTEXITCODE)" }
 
 # --- Assemble the package -------------------------------------------------------
-$BuildDir = Join-Path $WorkDir "qemu-$QemuVersion/build"
-$DestDir = Join-Path $BuildDir "dest"
+# `make install DESTDIR` cannot be used here: under MSYS2 the /usr prefix is
+# rewritten (files land inside the build's Python venv path). Assemble the
+# data dir manually instead — prebuilt firmware blobs (SeaBIOS, VGA/option
+# ROMs) from the source tree's pc-bios/, then generated files (keymaps,
+# decompressed edk2 images) overlaid from build/pc-bios/. prune-firmware.ts
+# verifies the required firmware set afterwards.
+$SourceDir = Join-Path $WorkDir "qemu-$QemuVersion"
+$BuildDir = Join-Path $SourceDir "build"
 $BinDir = Join-Path $PackageDir "bin"
 $ShareDir = Join-Path $PackageDir "share/qemu"
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $BinDir, $ShareDir
 New-Item -ItemType Directory -Force -Path $BinDir, $ShareDir | Out-Null
 
 foreach ($bin in $Binaries) {
-    Copy-Item (Join-Path $DestDir "usr/bin/$bin") $BinDir
+    Copy-Item (Join-Path $BuildDir $bin) $BinDir
 }
-Copy-Item -Recurse (Join-Path $DestDir "usr/share/qemu/*") $ShareDir
+Copy-Item -Recurse -Force (Join-Path $SourceDir "pc-bios/*") $ShareDir
+Copy-Item -Recurse -Force (Join-Path $BuildDir "pc-bios/*") $ShareDir
+# Drop build-system files and compressed edk2 sources that came along with
+# the source-tree copy.
+Get-ChildItem $ShareDir -Recurse -Include meson.build, *.bz2 | Remove-Item -Force
 node --experimental-strip-types (Join-Path $RepoRoot "scripts/prune-firmware.ts") $PackageDir
 
 # DLLs live next to the executables on Windows. collect-runtime-deps needs
