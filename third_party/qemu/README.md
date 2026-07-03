@@ -11,9 +11,9 @@ source/          build-time working directory (gitignored; tarball + tree)
 
 ## Current pin
 
-- **Version:** 11.0.1 (`v11.0.1`)
-- **Tarball:** `https://download.qemu.org/qemu-11.0.1.tar.xz`
-- **SHA-256:** `0d235f5820278d914a3155ec27af8e4258d697ea892895570807d69c0cb8cd64`
+- **Version:** 11.0.2 (`v11.0.2`)
+- **Tarball:** `https://download.qemu.org/qemu-11.0.2.tar.xz`
+- **SHA-256:** `3745f6ea88e2e87fe0dc838b2b1d4e0a770bf48e01a1d5a186842a1fff76ccf5`
 
 ## Version policy
 
@@ -23,7 +23,7 @@ source/          build-time working directory (gitignored; tarball + tree)
   whose `build-info.json` disagrees with `QEMU_VERSION`.
 - **New stable series** (e.g. 11.0 → 11.1): bump within one month of the
   upstream release, after the full build matrix and boot smoke tests pass.
-- **Point/security releases on the pinned series** (e.g. 11.0.1 → 11.0.2):
+- **Point/security releases on the pinned series** (e.g. 11.0.2 → 11.0.3):
   bump within two weeks; security fixes affecting the shipped configuration
   (x86_64/aarch64 softmmu, slirp networking) get an out-of-band npm release.
 - The npm package version bumps independently and never encodes the QEMU

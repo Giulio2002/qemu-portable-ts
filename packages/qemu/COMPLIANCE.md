@@ -8,19 +8,19 @@ package that is missing any of the artifacts below.
 ## QEMU version
 
 The pinned upstream version is recorded in `third_party/qemu/QEMU_VERSION`
-(currently **11.0.1**, git ref `v11.0.1`) with the source tarball SHA-256 in
+(currently **11.0.2**, git ref `v11.0.2`) with the source tarball SHA-256 in
 `third_party/qemu/checksums/`. Every binary package additionally records its
 exact provenance in `build-info.json`:
 
 ```json
 {
-  "qemuVersion": "11.0.1",
-  "qemuGitRef": "v11.0.1",
+  "qemuVersion": "11.0.2",
+  "qemuGitRef": "v11.0.2",
   "builtAt": "…",
   "targets": ["qemu-system-x86_64", "qemu-system-aarch64", "qemu-img"],
   "configureArgs": ["--target-list=x86_64-softmmu,aarch64-softmmu", "…"],
   "runtimeDependencies": ["…"],
-  "sourceArchiveSha256": "0d235f5820278d914a3155ec27af8e4258d697ea892895570807d69c0cb8cd64",
+  "sourceArchiveSha256": "3745f6ea88e2e87fe0dc838b2b1d4e0a770bf48e01a1d5a186842a1fff76ccf5",
   "patches": []
 }
 ```
