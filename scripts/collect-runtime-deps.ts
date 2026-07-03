@@ -261,11 +261,14 @@ const notices = [
   "GPL-2.0.txt and QEMU-LICENSE.txt) together with the following dynamic",
   "libraries collected at build time:",
   "",
+  // License only, no source path: build-host paths (CI work trees, package
+  // manager prefixes) must not leak into a published file, and the leak scan
+  // in verify-binary-package.ts enforces that.
   ...(deps.length === 0
     ? ["  (none — binaries are statically linked apart from system libraries)"]
     : deps
         .sort((a, b) => a.file.localeCompare(b.file))
-        .map((d) => `  ${d.file}\n    source: ${d.from}\n    license: ${d.license}`)),
+        .map((d) => `  ${d.file}\n    license: ${d.license}`)),
   "",
   "Full license texts for these components are available in their upstream",
   "distributions and in the source archive published with each release.",

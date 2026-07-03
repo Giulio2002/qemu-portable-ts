@@ -192,7 +192,7 @@ if (existsSync(buildInfoPath)) {
 // --- absolute build-path leaks ---------------------------------------------------------
 // The data dir must be located via -L at runtime; no file in the package may
 // hard-reference the CI build tree.
-const leakPatterns = ["/home/runner/", "/Users/runner/", "D:\\a\\", "/__w/"];
+const leakPatterns = ["/home/runner/", "/Users/runner/", "D:\\a\\", "C:\\a\\", "/__w/"];
 function scanForLeaks(dir: string): void {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
