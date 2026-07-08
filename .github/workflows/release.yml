@@ -126,7 +126,11 @@ jobs:
           curl -fL --retry 3 -o "/tmp/source-release/qemu-${QEMU_VERSION}.tar.xz" \
             "https://download.qemu.org/qemu-${QEMU_VERSION}.tar.xz"
           (cd /tmp/source-release && sha256sum -c "$GITHUB_WORKSPACE/third_party/qemu/checksums/qemu-${QEMU_VERSION}.tar.xz.sha256")
-          cp -R third_party/qemu/patches /tmp/source-release/patches
+          # patches/ is empty until we carry local patches, and git does not
+          # track empty directories, so it may be absent on checkout.
+          if [ -d third_party/qemu/patches ] && [ -n "$(ls -A third_party/qemu/patches)" ]; then
+            cp -R third_party/qemu/patches /tmp/source-release/patches
+          fi
           mkdir -p /tmp/source-release/build-scripts
           cp scripts/build-qemu-*.sh scripts/build-qemu-*.ps1 \
              scripts/collect-runtime-deps.ts scripts/generate-build-info.ts \
