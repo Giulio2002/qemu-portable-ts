@@ -64,11 +64,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             ninja-build meson pkg-config python3 python3-venv \
-            libglib2.0-dev libpixman-1-dev libslirp-dev patchelf xz-utils
+            libglib2.0-dev libpixman-1-dev libslirp-dev nettle-dev patchelf xz-utils
 
       - name: Install build dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install ninja meson pkg-config glib pixman libslirp
+        run: brew install ninja meson pkg-config glib pixman libslirp nettle
 
       - name: Install build dependencies (Windows / MSYS2)
         if: runner.os == 'Windows'
@@ -87,7 +87,7 @@ jobs:
             ${{ matrix.mingw_prefix }}-toolchain ${{ matrix.mingw_prefix }}-ninja
             ${{ matrix.mingw_prefix }}-meson ${{ matrix.mingw_prefix }}-pkg-config
             ${{ matrix.mingw_prefix }}-glib2 ${{ matrix.mingw_prefix }}-pixman
-            ${{ matrix.mingw_prefix }}-libslirp
+            ${{ matrix.mingw_prefix }}-libslirp ${{ matrix.mingw_prefix }}-nettle
 
       - name: Build QEMU and assemble package (Unix)
         if: runner.os != 'Windows' && matrix.musl_image == ''

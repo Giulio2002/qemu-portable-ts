@@ -21,7 +21,7 @@ node --version
 apk add --no-cache \
   bash curl git tar xz coreutils build-base linux-headers \
   ninja meson pkgconf python3 py3-setuptools py3-pip \
-  glib-dev pixman-dev libslirp-dev patchelf
+  glib-dev pixman-dev libslirp-dev nettle-dev patchelf
 
 bash scripts/build-qemu-linux.sh "$PACKAGE_DIR"
 

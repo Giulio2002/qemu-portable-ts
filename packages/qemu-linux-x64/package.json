@@ -1,6 +1,6 @@
 {
   "name": "qemu-portable-linux-x64",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Vendored QEMU binaries for Linux x64 glibc",
   "os": [
     "linux"

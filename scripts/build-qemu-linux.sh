@@ -58,6 +58,9 @@ CONFIGURE_ARGS=(
   "--disable-gtk"
   "--disable-sdl"
   "--enable-slirp"
+  # LUKS needs a crypto backend. Without this QEMU silently builds the
+  # cipher stub and every encrypted image fails at runtime instead.
+  "--enable-nettle"
   "--prefix=/usr"
 )
 mkdir -p build && cd build

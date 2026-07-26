@@ -57,7 +57,10 @@ $Msys2Bash = Join-Path $Msys2Root "usr\bin\bash.exe"
 if (-not (Test-Path $Msys2Bash)) {
     throw "bash.exe not found at $Msys2Bash — set QEMU_MSYS2_ROOT to the MSYS2 root (setup-msys2's msys2-location output)"
 }
-$ConfigureArgs = "--target-list=$TargetList --disable-docs --disable-werror --disable-gtk --disable-sdl --enable-slirp"
+# --enable-nettle for the same reason as WHPX: LUKS needs a crypto backend,
+# and without it QEMU silently compiles the cipher stub, so every encrypted
+# image fails at runtime with "no crypto library enabled in build".
+$ConfigureArgs = "--target-list=$TargetList --disable-docs --disable-werror --disable-gtk --disable-sdl --enable-slirp --enable-nettle"
 if ($MsysEnv -ne "CLANGARM64") {
     # QEMU's WHPX accelerator only exists for x86 hosts; win32-arm64 is
     # TCG-only until upstream grows aarch64 WHPX support.

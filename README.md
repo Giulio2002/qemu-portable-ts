@@ -76,6 +76,12 @@ await qemuImg.create({
 
 ### Encrypted disks (LUKS)
 
+> **Requires platform packages 0.2.1 or newer.** LUKS needs a crypto backend
+> compiled into QEMU. The 0.2.0 binaries were built without one on Linux and
+> Windows and fail with `no crypto library enabled in build`; from 0.2.1 the
+> builds pass `--enable-nettle`, so a missing crypto library fails the build
+> instead of shipping silently.
+
 Two shapes, both real LUKS:
 
 - `format: "qcow2"` — LUKS-encrypted clusters inside a qcow2 container, so you
