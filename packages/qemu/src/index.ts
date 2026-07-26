@@ -4,6 +4,7 @@ export * from "./process";
 export * from "./version";
 export * from "./features";
 export * from "./diagnostics";
+export * from "./secret";
 export * from "./qemu-img";
 export * from "./args";
 export * from "./vm";

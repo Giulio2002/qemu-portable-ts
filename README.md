@@ -62,6 +62,117 @@ await qemuImg.convert({ input: "./disk.qcow2", output: "./disk.raw", outputForma
 await qemuImg.resize({ path: "./disk.qcow2", size: "+5G" });
 ```
 
+qcow2 tuning lives under `qcow2`, and applies to plain and encrypted images alike:
+
+```ts
+await qemuImg.create({
+  path: "./disk.qcow2",
+  size: "20G",
+  format: "qcow2",
+  preallocation: "metadata",
+  qcow2: { clusterSize: "2M", lazyRefcounts: true, compressionType: "zstd" },
+});
+```
+
+### Encrypted disks (LUKS)
+
+Two shapes, both real LUKS:
+
+- `format: "qcow2"` — LUKS-encrypted clusters inside a qcow2 container, so you
+  keep snapshots, backing files and sparseness.
+- `format: "luks"` — a bare LUKS container, the same on-disk format
+  `cryptsetup` produces, so the guest (or the host) can open it directly.
+
+```ts
+import { qemuImg, createVm } from "qemu-portable";
+
+await qemuImg.create({
+  path: "./vault.qcow2",
+  size: "20G",
+  format: "qcow2",
+  encryption: { passphrase: process.env.DISK_PASSPHRASE!, cipherAlg: "aes-256" },
+});
+
+// Reading an encrypted image needs both the key and an explicit format.
+const info = await qemuImg.info("./vault.qcow2", {
+  format: "qcow2",
+  encryption: { passphrase: process.env.DISK_PASSPHRASE! },
+});
+
+const vm = createVm({
+  target: "x86_64",
+  memory: "2G",
+  disks: [{
+    path: "./vault.qcow2",
+    format: "qcow2",
+    encryption: { passphrase: process.env.DISK_PASSPHRASE! },
+  }],
+});
+```
+
+The passphrase never appears in the process's argv, which is world-readable
+through `ps` on most systems. It is written to a `0600` file in a `0700`
+temp directory and handed to QEMU as a `secret` object; `createVm` deletes
+that file when the VM exits (or on `vm.cleanupSecrets()`). If you manage the
+key file yourself, pass `{ passphraseFile }` instead — those are used as-is
+and never deleted.
+
+Four things that are easy to get wrong, all enforced or documented by the API:
+
+- **A key file's exact bytes are the passphrase.** `echo pass > key` appends a
+  newline and will fail to unlock. Use `printf '%s'`, or pass `{ passphrase }`
+  and let this library write the file.
+- **Encrypted images cannot be format-probed**, because probing means opening
+  them. Every read (`info`, `check`, `resize`, `convert`) and every encrypted
+  disk in a `VmConfig` must state its `format`.
+- **`qemuImg.info()` does not validate a passphrase** — it reads the LUKS
+  header without ever deriving a key, so it succeeds under a wrong one. Use
+  `qemuImg.verifyPassphrase()`, which actually opens the image.
+- **Key derivation is deliberately slow.** That cost is set at creation time by
+  `iterTime` (milliseconds per keyslot) and paid on every open, including
+  `verifyPassphrase`. Leave it at QEMU's default for real data; lower it only
+  in tests.
+
+```ts
+const ok = await qemuImg.verifyPassphrase("./vault.qcow2", "qcow2", {
+  passphrase: process.env.DISK_PASSPHRASE!,
+});
+```
+
+**Backing files:** encrypt the *overlay*, keep the base in the clear.
+
+```ts
+// Shared read-only base, per-guest encrypted overlay.
+await qemuImg.create({ path: "./base.qcow2", size: "20G", format: "qcow2" });
+await qemuImg.create({
+  path: "./guest-1.qcow2",
+  size: "20G",
+  format: "qcow2",
+  backingFile: "./base.qcow2",
+  backingFormat: "qcow2",
+  encryption: { passphrase: perGuestKey },
+});
+```
+
+The reverse — an overlay on top of an *encrypted* base — is not supported by
+QEMU's tooling: there is no way to hand a key to the backing node through
+`qemu-img`, so the resulting image cannot be opened again (verified against
+QEMU 11.0.2). Since a base image is normally a shared read-only OS image and
+the overlay holds everything guest-specific, encrypting the overlay is also
+the arrangement you usually want.
+
+Converting in or out of encryption is a `convert` with a key on either side:
+
+```ts
+await qemuImg.convert({
+  input: "./plain.raw",
+  inputFormat: "raw",
+  output: "./vault.luks",
+  outputFormat: "luks",
+  outputEncryption: { passphrase: process.env.DISK_PASSPHRASE! },
+});
+```
+
 ### Booting a VM
 
 ```ts

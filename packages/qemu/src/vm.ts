@@ -2,10 +2,15 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { VmConfig, buildQemuSystemArgs } from "./args";
+import { DiskConfig, VmConfig, buildQemuSystemArgs } from "./args";
 import { GuestAgentError } from "./errors";
 import { QemuSystemCommand } from "./platform";
 import { QemuProcess, QemuRunOptions, spawnQemu } from "./process";
+import {
+  MaterializedSecret,
+  PassphraseSource,
+  materializePassphrase,
+} from "./secret";
 import {
   ResolveQemuOptions,
   ResolvedQemuBinary,
@@ -22,6 +27,19 @@ export interface BuiltVmCommand {
   args: string[];
   resolved: ResolvedQemuBinary;
 }
+
+/**
+ * A disk as accepted by {@link createVm}, which — unlike the pure arg
+ * builders — can take an inline `passphrase` and write the key file itself.
+ */
+export type VmDiskInput = Omit<DiskConfig, "encryption"> & {
+  encryption?: PassphraseSource;
+};
+
+/** {@link VmConfig} with the more permissive disk encryption input. */
+export type CreateVmConfig = Omit<VmConfig, "disks"> & {
+  disks?: VmDiskInput[];
+};
 
 export interface QemuVm {
   config: VmConfig;
@@ -41,6 +59,13 @@ export interface QemuVm {
    * redirection work); an argv array runs a binary directly.
    */
   exec(command: string | string[], options?: GuestExecOptions): Promise<GuestExecResult>;
+  /**
+   * Deletes any passphrase files this VM wrote from an inline `passphrase`.
+   * `start()` already does this when the QEMU process exits; call it yourself
+   * if you only ever called `build()`, or to drop the keys early. Files you
+   * supplied as `passphraseFile` are never touched.
+   */
+  cleanupSecrets(): void;
 }
 
 export interface CreateVmOptions {
@@ -70,6 +95,31 @@ function normalizeGuestAgent(config: VmConfig): {
   };
 }
 
+/**
+ * Writes a key file for every disk that was given an inline passphrase, and
+ * rewrites those disks to the file-only shape the pure builders accept.
+ * Disks that already point at a `passphraseFile` pass through untouched.
+ */
+function normalizeDiskSecrets(config: CreateVmConfig): {
+  config: VmConfig;
+  secrets: MaterializedSecret[];
+} {
+  const secrets: MaterializedSecret[] = [];
+  if (!config.disks?.some((disk) => disk.encryption)) {
+    return { config: config as VmConfig, secrets };
+  }
+
+  const disks: DiskConfig[] = config.disks.map((disk) => {
+    if (!disk.encryption) return disk as DiskConfig;
+    const secret = materializePassphrase(disk.encryption);
+    // Only track what we created, so cleanup can never delete a caller's file.
+    if (disk.encryption.passphrase !== undefined) secrets.push(secret);
+    return { ...disk, encryption: { passphraseFile: secret.file } };
+  });
+
+  return { config: { ...config, disks }, secrets };
+}
+
 /** Builds args and resolves the vendored binary without starting anything. */
 export function buildVmArgs(
   config: VmConfig,
@@ -86,20 +136,37 @@ export function buildVmArgs(
  * Creates a VM handle from a config. Nothing runs until start() is called;
  * build() exposes the exact command line for auditing or logging first.
  */
-export function createVm(config: VmConfig, options: CreateVmOptions = {}): QemuVm {
-  const { config: normalizedConfig, guestAgentSocketPath } = normalizeGuestAgent(config);
+export function createVm(
+  config: CreateVmConfig,
+  options: CreateVmOptions = {}
+): QemuVm {
+  const { config: withSecrets, secrets } = normalizeDiskSecrets(config);
+  const { config: normalizedConfig, guestAgentSocketPath } =
+    normalizeGuestAgent(withSecrets);
+
+  const cleanupSecrets = (): void => {
+    for (const secret of secrets) secret.cleanup();
+  };
+
   return {
     config: normalizedConfig,
     guestAgentSocketPath,
+    cleanupSecrets,
     build() {
       return buildVmArgs(normalizedConfig, options);
     },
     start(runOptions: QemuRunOptions = {}) {
       const built = buildVmArgs(normalizedConfig, options);
-      return spawnQemu(built.command, built.args, {
+      const proc = spawnQemu(built.command, built.args, {
         ...runOptions,
         resolved: built.resolved,
       });
+      // QEMU reads secrets once, at startup, so the key files are only needed
+      // for the life of the process. Drop them as soon as it is gone rather
+      // than leaving passphrases in the temp directory.
+      proc.child.once("close", cleanupSecrets);
+      proc.child.once("error", cleanupSecrets);
+      return proc;
     },
     exec(command: string | string[], execOptions: GuestExecOptions = {}) {
       if (!guestAgentSocketPath) {

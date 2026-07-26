@@ -4,7 +4,22 @@ import {
   GuestTarget,
   QemuSystemCommand,
 } from "./platform";
-import type { DiskImageFormat } from "./qemu-img";
+import type { DiskImageFormat, EncryptableFormat } from "./qemu-img";
+import { secretObjectArgs } from "./secret";
+
+/**
+ * Unlocks a LUKS-encrypted disk at boot.
+ *
+ * Only a file is accepted here: these builders are pure, and an inline
+ * passphrase would have to be written to disk. `createVm()` accepts
+ * `{ passphrase }` and provisions the file for you.
+ *
+ * The file's exact bytes are the passphrase — a trailing newline is part of
+ * it. See {@link PassphraseSource}.
+ */
+export interface DiskEncryptionConfig {
+  passphraseFile: string;
+}
 
 export interface DiskConfig {
   path: string;
@@ -12,6 +27,13 @@ export interface DiskConfig {
   interface?: "virtio" | "ide" | "scsi";
   readonly?: boolean;
   snapshot?: boolean;
+  /**
+   * Passphrase for a LUKS-encrypted disk. Requires `format` to be "qcow2"
+   * (LUKS-encrypted clusters) or "luks" (a bare LUKS container), since the
+   * two spell the key option differently and an encrypted image must not be
+   * format-probed.
+   */
+  encryption?: DiskEncryptionConfig;
 }
 
 export interface KernelBootConfig {
@@ -132,6 +154,35 @@ export function getAccelerationArgs(
   return ["-accel", "tcg"];
 }
 
+/**
+ * Validates that an encrypted disk names a format that can actually carry
+ * LUKS, and returns it. Probing is not an option here: QEMU would have to
+ * open the image to guess the format, which is exactly what needs the key.
+ */
+function encryptedDiskFormat(disk: DiskConfig, index: number): EncryptableFormat {
+  if (!disk.format) {
+    throw new InvalidVmConfigError(
+      `disks[${index}] sets encryption but no format. An encrypted disk must ` +
+        `declare format: "qcow2" or "luks" — it cannot be probed.`
+    );
+  }
+  if (disk.format !== "qcow2" && disk.format !== "luks") {
+    throw new InvalidVmConfigError(
+      `disks[${index}] has format ${JSON.stringify(disk.format)}, which ` +
+        `cannot be encrypted. Use "qcow2" or "luks".`
+    );
+  }
+  if (!disk.encryption?.passphraseFile) {
+    throw new InvalidVmConfigError(
+      `disks[${index}] sets encryption without a passphraseFile. ` +
+        `createVm() provisions one when you pass \`{ passphrase }\`; the pure ` +
+        `arg builders need it explicit, e.g. ` +
+        `\`encryption: { passphraseFile: '/run/keys/disk0' }\`.`
+    );
+  }
+  return disk.format;
+}
+
 function diskArgs(disk: DiskConfig, index: number): string[] {
   // Every interpolated field is escaped, not just the path: a caller that
   // passes an unvalidated format/interface string must not be able to inject
@@ -142,7 +193,24 @@ function diskArgs(disk: DiskConfig, index: number): string[] {
   parts.push(`index=${index}`);
   if (disk.readonly) parts.push("readonly=on");
   if (disk.snapshot) parts.push("snapshot=on");
-  return ["-drive", parts.join(",")];
+
+  if (!disk.encryption) return ["-drive", parts.join(",")];
+
+  const format = encryptedDiskFormat(disk, index);
+  const secretId = `sec-disk${index}`;
+  // qcow2 namespaces the key under `encrypt.`; the bare luks driver does not.
+  const keyOption = format === "qcow2" ? "encrypt.key-secret" : "key-secret";
+  parts.push(`${keyOption}=${secretId}`);
+
+  // The secret object is declared immediately before the drive that uses it.
+  return [
+    ...secretObjectArgs(
+      { id: secretId, file: disk.encryption.passphraseFile },
+      "-object"
+    ),
+    "-drive",
+    parts.join(","),
+  ];
 }
 
 function hostForwardSpec(fwd: HostForward): string {

@@ -68,6 +68,15 @@ export class InvalidVmConfigError extends QemuError {
 }
 
 /**
+ * A disk-image or encryption configuration cannot be translated into valid
+ * qemu-img arguments (e.g. encryption on a format that cannot carry it, or a
+ * secret without a passphrase).
+ */
+export class InvalidImageConfigError extends QemuError {
+  readonly code = "ERR_QEMU_INVALID_IMAGE_CONFIG";
+}
+
+/**
  * A command string that is not one of the known QEMU commands was passed to
  * the resolver/process layer. Guards against path traversal and arbitrary
  * binary execution when a caller forwards untrusted input as a command.

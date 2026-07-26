@@ -33,6 +33,11 @@ isolation boundary that QEMU itself doesn't provide.
   it will buffer, and responses are correlated by command id (not arrival
   order) so a dropped/late reply cannot mis-deliver one command's result to
   another caller.
+- **Disk passphrases leaking through the process table.** A LUKS passphrase is
+  never placed in argv, where any local user can read it with `ps`. It reaches
+  QEMU only as a `secret` object backed by a file. An inline `{ passphrase }`
+  is written to a `0600` file inside a `0700` temp directory and deleted when
+  the VM process exits.
 
 ### What this library does **not** defend against
 
@@ -84,6 +89,10 @@ runs — that is inherent to running a VM.
 | `network.hostForwards[].hostPort` / `guestPort` | **Validated** integer in `0..65535`. |
 | `network.hostForwards[].hostAddress` / `guestAddress` | **Validated** against a conservative IPv4/IPv6/hostname character set (no commas/spaces). |
 | `qmp.socketPath` | **Escaped**; only ever emitted as a `unix:` socket. |
+| `disk.encryption.passphrase` (`createVm`) / `encryption.passphrase` (`qemuImg`) | **Never emitted to argv.** Written verbatim to a `0600` file in a `0700` temp dir, referenced by a `secret` object, and deleted on VM exit / command completion. |
+| `disk.encryption.passphraseFile` | **Escaped** into the `secret` object. The file is caller-owned: used as-is, contents never inspected, never deleted. |
+| Secret object ids | **Generated internally** (`sec0`, `sec-disk<n>`) and **validated** against `[A-Za-z0-9_-]+`, so they cannot terminate an option or start a new one. |
+| `encryption` cipher/hash/ivgen parameters | **Typed unions**, emitted as `-o` sub-options; `iterTime` is validated as a non-negative integer. |
 | `name` | **Escaped**. |
 | `machine`, `cpu`, `memory`, `smp`, `serial`, `kernel.*`, `cdrom` | Emitted as their **own argv tokens** — they cannot inject *other* options, but their content is otherwise trusted as configuration. |
 | `extraArgs` | **Passed through verbatim.** Escape hatch — untrusted input must never reach it. |
@@ -117,6 +126,21 @@ input.
       the *guest*, not the host — but it is still a privileged channel.
 - [ ] **Audit before you launch.** Call `vm.build().args` and log/inspect the
       exact argv, especially if any field derives from external input.
+- [ ] **Keep disk passphrases out of your own logs and argv.** The library
+      keeps them off QEMU's command line, but `vm.build().args` still contains
+      the *path* to the key file — and anything you pass to `extraArgs` is
+      verbatim. Never hand a passphrase to `extraArgs` or `qemuImg.raw()`.
+      Prefer `{ passphraseFile }` pointing at a file your process never writes
+      (a tmpfs/ramdisk mount, or a secret injected by your orchestrator) when
+      you do not want the key touching disk at all.
+- [ ] **Check a passphrase with `verifyPassphrase()`, not `info()`.**
+      `qemuImg.info()` reads the LUKS header without deriving a key and
+      succeeds under a wrong passphrase; treating it as an auth check is a
+      silent accept-anything. Note that `verifyPassphrase` deliberately costs
+      real CPU time, so rate-limit it if it is reachable from untrusted input.
+- [ ] **Do not let untrusted input choose an image's `format`.** Encrypted
+      images must declare their format (they cannot be probed), and a format
+      an attacker picks changes which driver parses the file.
 - [ ] **Add OS-level containment** if you need a real boundary: seccomp, a
       restricted user, cgroups/ulimits, a network namespace, or nesting the
       whole thing inside another VM. QEMU's own `-sandbox` may also apply.
@@ -185,6 +209,12 @@ spawnQemu(req.query.tool, args);
 
 // ❌ Exposing a forward or QMP to the world.
 hostForwards: [{ protocol: "tcp", hostAddress: "0.0.0.0", hostPort: 22, guestPort: 22 }];
+
+// ❌ Passphrase on the command line — readable by any local user via `ps`.
+createVm({ target: "x86_64", extraArgs: ["-object", `secret,id=s,data=${passphrase}`] });
+
+// ❌ info() is not a passphrase check: this succeeds with the wrong key.
+const ok = await qemuImg.info(path, { format: "qcow2", encryption: { passphrase } });
 ```
 
 ---
