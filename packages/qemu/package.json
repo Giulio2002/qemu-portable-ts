@@ -41,5 +41,9 @@
     "qemu-portable-win32-x64": "0.2.0",
     "qemu-portable-win32-arm64": "0.2.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Giulio2002/qemu-portable-ts.git"
+  },
   "license": "MIT"
 }
